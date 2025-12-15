@@ -234,6 +234,25 @@
         const DOC_ID = '1RjJTWQTPRwHtWC-fi1QnelKcpBXXB3eLw7Ld-beK2TE';
         const IS_DOCUMENT = true; // Sett til false hvis det er et Sheet
         const DEBUG = false; // Endre til true for feilsøking
+        const THRESHOLD_ECOLI = 1000; // Konfigurerbar grense for advarsel
+
+        // Hjelpefunksjon for fetch med timeout, slik at proxy-feil ikke henger
+        async function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                const response = await fetch(url, { ...options, signal: controller.signal });
+                return response;
+            } catch (err) {
+                // Gir mer informativ feil om det var et tidsavbrudd
+                if (err.name === 'AbortError') {
+                    throw new Error(`Tidsavbrudd etter ${timeoutMs / 1000}s mot ${url}`);
+                }
+                throw err;
+            } finally {
+                clearTimeout(timeout);
+            }
+        }
 
         // Hjelpefunksjon for logging som kan skrus av/på
         function log(...args) {
@@ -247,7 +266,7 @@
             const htmlUrl = `https://docs.google.com/document/d/${DOC_ID}/export?format=html`;
             log('Henter HTML fra:', htmlUrl);
             try {
-                const response = await fetch(htmlUrl, {
+                const response = await fetchWithTimeout(htmlUrl, {
                     method: 'GET',
                     mode: 'cors', // Prøv med 'cors' først
                     headers: {
@@ -261,7 +280,7 @@
                 // Fallback: Prøv via en CORS-proxy hvis direkte kall feiler
                 // Merk: Dette er en offentlig proxy, bruk med varsomhet i produksjon
                 const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(htmlUrl)}`;
-                const proxyResponse = await fetch(proxyUrl);
+                const proxyResponse = await fetchWithTimeout(proxyUrl, {}, 10000);
                 if (!proxyResponse.ok) throw new Error(`Proxy HTTP ${proxyResponse.status}: Kunne ikke hente dokument via proxy`);
                 return await proxyResponse.text();
             }
@@ -385,35 +404,48 @@
         // Funksjon for å parse CSV (håndterer kommaer i celler)
         function parseCSV(text) {
             const lines = [];
-            let currentLine = [];
-            let currentField = '';
+            let row = [];
+            let field = '';
             let inQuotes = false;
             
             for (let i = 0; i < text.length; i++) {
                 const char = text[i];
-                
+                const next = text[i + 1];
+
                 if (char === '"') {
-                    inQuotes = !inQuotes;
-                } else if (char === ',' && !inQuotes) {
-                    currentLine.push(currentField.trim());
-                    currentField = '';
-                } else if (char === '\n' && !inQuotes) {
-                    currentLine.push(currentField.trim());
-                    if (currentLine.length > 0 && currentLine.some(cell => cell !== '')) {
-                        lines.push(currentLine);
+                    // Håndter escape av anførselstegn ("")
+                    if (inQuotes && next === '"') {
+                        field += '"';
+                        i++; // hopp over neste "
+                        continue;
                     }
-                    currentLine = [];
-                    currentField = '';
-                } else {
-                    currentField += char;
+                    inQuotes = !inQuotes;
+                    continue;
                 }
+
+                if (!inQuotes && (char === '\n' || char === '\r')) {
+                    // Håndter CRLF som linjeskift
+                    if (char === '\r' && next === '\n') i++;
+                    row.push(field.trim());
+                    if (row.some(cell => cell !== '')) lines.push(row);
+                    row = [];
+                    field = '';
+                    continue;
+                }
+
+                if (char === ',' && !inQuotes) {
+                    row.push(field.trim());
+                    field = '';
+                    continue;
+                }
+
+                field += char;
             }
             
-            if (currentField || currentLine.length > 0) {
-                currentLine.push(currentField.trim());
-                if (currentLine.length > 0 && currentLine.some(cell => cell !== '')) {
-                    lines.push(currentLine);
-                }
+            // Flush siste felt/linje
+            if (field.length > 0 || row.length > 0) {
+                row.push(field.trim());
+                if (row.some(cell => cell !== '')) lines.push(row);
             }
             
             return lines;
@@ -543,6 +575,7 @@
                                 
                                 // Legg til rader
                                 rows.forEach(row => {
+                                    if (!row || !row.c) return; // Guard mot tomme rader
                                     const values = row.c.map(cell => {
                                         if (!cell || cell.v === null || cell.v === undefined) return '';
                                         // Escape kommaer og anførselstegn
@@ -855,18 +888,26 @@
             
             // Håndter spesielle verdier som "*", ">2420", osv.
             let foundValue = null;
+            let isEstimate = false;
+            let rawValue = valueStr;
             
             // Funksjon for å rense og parse verdi
             const parseValue = (val) => {
-                if (!val || val === '*' || val === '-') return null;
+                if (!val || val === '*' || val === '-') return { value: null, isEstimate: false };
                 let clean = val;
-                if (clean.startsWith('>')) clean = clean.substring(1);
+                let estimated = false;
+                if (clean.startsWith('>')) {
+                    estimated = true;
+                    clean = clean.substring(1);
+                }
                 clean = clean.replace(/[^\d.-]/g, '');
                 const num = parseFloat(clean);
-                return isNaN(num) ? null : num;
+                return isNaN(num) ? { value: null, isEstimate: estimated } : { value: num, isEstimate: estimated };
             };
 
-            foundValue = parseValue(valueStr);
+            const parsed = parseValue(valueStr);
+            foundValue = parsed.value;
+            isEstimate = parsed.isEstimate;
             
             // Hvis vi ikke fant verdi for gjeldende uke, prøv forrige uke
             let actualWeek = bestMatch ? bestMatch.week : currentWeek;
@@ -880,10 +921,12 @@
                 
                 if (prevWeekMatch) {
                     const prevValueStr = havetArenaRow[prevWeekMatch.columnIndex].trim();
-                    const prevValue = parseValue(prevValueStr);
+                    const prevParsed = parseValue(prevValueStr);
                     
-                    if (prevValue !== null) {
-                        foundValue = prevValue;
+                    if (prevParsed.value !== null) {
+                        foundValue = prevParsed.value;
+                        isEstimate = prevParsed.isEstimate;
+                        rawValue = prevValueStr;
                         actualWeek = prevWeek;
                         log(`Fant verdi for forrige uke (${prevWeek}):`, foundValue);
                     }
@@ -935,7 +978,9 @@
                 value: foundValue,
                 availableWeeks: uniqueWeeks,
                 searchedWeek: currentWeek,
-                actualWeek: actualWeek // Hvilken uke som faktisk ble brukt
+                actualWeek: actualWeek, // Hvilken uke som faktisk ble brukt
+                isEstimate,
+                rawValue
             };
         }
 
@@ -956,12 +1001,16 @@
             let errorMessage = null;
             let availableWeeks = null;
             let actualWeek = null;
+            let isEstimate = false;
+            let rawValue = null;
             
             if (typeof result === 'object' && result !== null) {
                 value = result.value;
                 errorMessage = result.error;
                 availableWeeks = result.availableWeeks;
                 actualWeek = result.actualWeek;
+                isEstimate = result.isEstimate;
+                rawValue = result.rawValue;
             } else {
                 value = result;
             }
@@ -984,7 +1033,7 @@
             
             valueDisplay.textContent = Math.round(value);
             
-            if (value >= 1000) {
+            if (value >= THRESHOLD_ECOLI) {
                 valueDisplay.className = 'value-display red';
                 statusText.textContent = '⚠️ Ikke anbefalt for bading';
                 statusText.className = 'status-text red';
@@ -1000,6 +1049,11 @@
                 weekInfo.textContent = `Uke ${weekToShow} (søkte etter uke ${currentWeek}), ${currentDate.getFullYear()}`;
             } else {
                 weekInfo.textContent = `Uke ${weekToShow}, ${currentDate.getFullYear()}`;
+            }
+
+            // Hvis verdien var estimert (>), vis dette som fotnote
+            if (isEstimate && rawValue) {
+                weekInfo.textContent += ` — estimert verdi (${rawValue.trim()})`;
             }
         }
 
