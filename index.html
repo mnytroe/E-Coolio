@@ -96,6 +96,32 @@
             font-size: 0.9em;
         }
 
+        .temperature-container {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+
+        .temperature-display {
+            color: #2c3e50;
+            font-size: 1.2em;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .temp-icon {
+            font-size: 1.3em;
+        }
+
+        #tempValue, #seaTempValue {
+            font-weight: 600;
+        }
+
         .loading {
             color: #7f8c8d;
             font-size: 1.2em;
@@ -240,6 +266,14 @@
                 color: #e0e0e0;
             }
 
+            .temperature-display {
+                color: #e0e0e0;
+            }
+
+            .temperature-container {
+                gap: 20px;
+            }
+
             .info-section {
                 background: #202133;
                 color: #e0e0e0;
@@ -265,7 +299,17 @@
     <div class="container">
         <div class="sauna-icon">🏊‍♂️</div>
         <h1>Havet Arena</h1>
-        <p class="subtitle">Badevilkår denne uken</p>
+        <div class="temperature-container">
+            <div id="temperature" class="temperature-display" style="display: none;">
+                <span class="temp-icon">🌡️</span>
+                <span id="tempValue">-</span>°C
+            </div>
+            <div id="seaTemperature" class="temperature-display" style="display: none;">
+                <span class="temp-icon">🌊</span>
+                <span id="seaTempValue">-</span>°C
+            </div>
+        </div>
+        <p class="subtitle">Bakterieverdier per 100 ml denne uken:</p>
         
         <div id="loading" class="loading">Henter data...</div>
         
@@ -369,6 +413,203 @@
         }
         
         // === DATA-HENTING ===
+        
+        // Hent værtemperatur fra Open-Meteo API
+        async function getTempAtHavetSauna() {
+            const lat = 63.44181021566446;
+            const lon = 10.42506878174522;
+
+            const url =
+                "https://api.open-meteo.com/v1/forecast"
+                + `?latitude=${lat}&longitude=${lon}`
+                + "&current=temperature_2m"
+                + "&timezone=Europe%2FOslo";
+
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`Open-Meteo failed: ${res.status}`);
+
+            const data = await res.json();
+
+            // Returnerer kun temperatur (°C)
+            return data?.current?.temperature_2m;
+        }
+
+        // Oppdater temperatur i UI
+        async function updateTemperature() {
+            try {
+                const temp = await getTempAtHavetSauna();
+                const tempElement = document.getElementById('temperature');
+                const tempValue = document.getElementById('tempValue');
+                
+                if (tempElement && tempValue && temp !== null && temp !== undefined) {
+                    tempValue.textContent = Math.round(temp);
+                    tempElement.style.display = 'flex';
+                }
+            } catch (error) {
+                log('Kunne ikke hente temperatur:', error);
+                // Ikke vis feilmelding for temperatur - det er ikke kritisk
+            }
+        }
+
+        // Hent badetemperatur fra Havvarsel API eller nettside
+        async function getSeaTemperatureAtHavetArena() {
+            const lat = 63.44181;
+            const lon = 10.42506;
+            
+            // Prøv API først
+            const apiUrl = `https://api.havvarsel.no/apis/duapi/havvarsel/v2/temperatureprojection/${lon}/${lat}`;
+            log('Henter badetemperatur fra API:', apiUrl);
+            
+            try {
+                const res = await fetchWithRetry(() => fetchWithTimeout(apiUrl, {
+                    method: 'GET',
+                    mode: 'cors',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                }));
+                
+                if (!res.ok) {
+                    log('Havvarsel API respons ikke OK:', res.status, res.statusText);
+                    throw new Error(`Havvarsel API forespørsel feilet: ${res.status}`);
+                }
+
+                const data = await res.json();
+                log('Havvarsel API data mottatt:', data);
+
+                // Prøv forskjellige mulige strukturer
+                const temp = data?.temperature || data?.temp || data?.value || 
+                            (data?.data && (data.data.temperature || data.data.temp || data.data.value)) ||
+                            (Array.isArray(data) && data[0]?.temperature) ||
+                            null;
+
+                if (temp !== null) {
+                    return temp;
+                }
+                
+                log('Kunne ikke finne temperatur i API-respons. Struktur:', JSON.stringify(data));
+            } catch (error) {
+                log('Direkte API-fetch feilet, prøver via proxy...', error);
+                // Fallback: Prøv via en CORS-proxy hvis direkte kall feiler
+                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`;
+                try {
+                    const proxyResponse = await fetchWithRetry(() => fetchWithTimeout(proxyUrl, {}, 10000));
+                    if (proxyResponse.ok) {
+                const data = await proxyResponse.json();
+                log('Havvarsel API data mottatt via proxy:', data);
+                log('Fullstendig API-struktur:', JSON.stringify(data, null, 2));
+
+                // Prøv forskjellige mulige strukturer basert på det vi ser i loggen
+                let temp = null;
+                
+                // Sjekk om det er en variables-array (som vi ser i loggen)
+                if (data?.variables && Array.isArray(data.variables) && data.variables.length > 0) {
+                    const variable = data.variables[0];
+                    // variable.data er en array med objekter som har {value, rawTime}
+                    if (variable?.data && Array.isArray(variable.data) && variable.data.length > 0) {
+                        // Ta den første (nåværende) temperaturen
+                        temp = variable.data[0]?.value;
+                        log('Fant temperatur i variables[0].data[0].value:', temp);
+                    } else {
+                        // Fallback til direkte felter hvis data-array ikke finnes
+                        temp = variable?.value || variable?.temperature || variable?.temp;
+                        log('Fant temperatur i variables[0] (fallback):', temp);
+                    }
+                }
+                
+                // Prøv også direkte felter
+                if (temp === null || temp === undefined) {
+                    temp = data?.temperature || data?.temp || data?.value || 
+                           data?.current?.temperature || data?.current?.temp ||
+                           (data?.data && (data.data.temperature || data.data.temp || data.data.value)) ||
+                           (Array.isArray(data) && data[0]?.temperature) ||
+                           null;
+                }
+                
+                // Sjekk queryPoint eller closestGridPoint
+                if (temp === null || temp === undefined) {
+                    if (data?.queryPoint?.temperature) temp = data.queryPoint.temperature;
+                    if (data?.closestGridPoint?.temperature) temp = data.closestGridPoint.temperature;
+                    if (data?.closestGridPointWithData?.temperature) temp = data.closestGridPointWithData.temperature;
+                    // Sjekk om det er verdier i queryPoint
+                    if (data?.queryPoint?.values && Array.isArray(data.queryPoint.values) && data.queryPoint.values.length > 0) {
+                        temp = data.queryPoint.values[0];
+                    }
+                }
+
+                if (temp !== null && temp !== undefined) {
+                    log('Fant temperatur:', temp);
+                    return temp;
+                } else {
+                    log('Kunne ikke finne temperatur i API-respons. Struktur:', JSON.stringify(data, null, 2));
+                }
+                    }
+                } catch (proxyError) {
+                    log('Proxy feilet også:', proxyError);
+                }
+            }
+            
+            // Fallback: Prøv å hente fra nettsiden direkte
+            log('Prøver å hente fra havvarsel.no nettside...');
+            try {
+                const pageUrl = `https://havvarsel.no/oversikt/${lat}/${lon}`;
+                const proxyPageUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(pageUrl)}`;
+                const pageResponse = await fetchWithRetry(() => fetchWithTimeout(proxyPageUrl, {}, 15000));
+                
+                if (pageResponse.ok) {
+                    const html = await pageResponse.text();
+                    log('Havvarsel.no HTML mottatt, lengde:', html.length);
+                    
+                    // Prøv å finne temperatur i HTML (søk etter tall etter "badetemperatur" eller lignende)
+                    const tempMatch = html.match(/(?:badetemperatur|vann?temp|sea.*temp)[^>]*>[\s\S]*?(\d+(?:[.,]\d+)?)\s*°?C/i) ||
+                                    html.match(/(\d+(?:[.,]\d+)?)\s*°?C[^<]*badetemperatur/i) ||
+                                    html.match(/badetemperatur[^>]*>[\s\S]{0,200}?(\d+(?:[.,]\d+)?)/i);
+                    
+                    if (tempMatch && tempMatch[1]) {
+                        const temp = parseFloat(tempMatch[1].replace(',', '.'));
+                        if (!isNaN(temp)) {
+                            log('Fant badetemperatur i HTML:', temp);
+                            return temp;
+                        }
+                    }
+                    
+                    log('Kunne ikke finne badetemperatur i HTML');
+                }
+            } catch (pageError) {
+                log('Kunne ikke hente fra nettside:', pageError);
+            }
+            
+            // Hvis alt feiler, returner null
+            log('Kunne ikke hente badetemperatur fra noen kilde');
+            return null;
+        }
+
+        // Oppdater badetemperatur i UI
+        async function updateSeaTemperature() {
+            try {
+                const temp = await getSeaTemperatureAtHavetArena();
+                const seaTempElement = document.getElementById('seaTemperature');
+                const seaTempValue = document.getElementById('seaTempValue');
+                
+                log('Badetemperatur hentet:', temp);
+                
+                if (seaTempElement && seaTempValue && temp !== null && temp !== undefined) {
+                    seaTempValue.textContent = Math.round(temp);
+                    seaTempElement.style.display = 'flex';
+                    log('Badetemperatur oppdatert i UI:', Math.round(temp));
+                } else {
+                    log('Kunne ikke oppdatere badetemperatur - elementer eller verdi mangler:', {
+                        seaTempElement: !!seaTempElement,
+                        seaTempValue: !!seaTempValue,
+                        temp: temp
+                    });
+                }
+            } catch (error) {
+                console.error('Kunne ikke hente badetemperatur:', error);
+                log('Kunne ikke hente badetemperatur:', error);
+                // Ikke vis feilmelding for temperatur - det er ikke kritisk
+            }
+        }
         
         // Hjelpefunksjon for å hente HTML fra dokumentet
         async function fetchDocumentHTML() {
@@ -1240,6 +1481,10 @@
         // === INITIALISERING ===
         // Last inn data når siden laster
         document.addEventListener('DOMContentLoaded', async () => {
+            // Hent temperaturer uavhengig av bakteriedata (ikke kritisk hvis det feiler)
+            updateTemperature();
+            updateSeaTemperature();
+            
             try {
                 const myRequestId = ++CURRENT_REQUEST_ID; // Marker denne forespørselen som "siste"
                 const value = await fetchWithCache();
