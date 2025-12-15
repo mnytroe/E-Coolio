@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Havet Arena - Badevilkår</title>
+        <!-- Favicon med sauna/badende emoji -->
+        <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='50%25' x='50%25' font-size='52' text-anchor='middle' dominant-baseline='central'%3E%F0%9F%8F%8A%E2%80%8D%E2%99%80%EF%B8%8F%3C/text%3E%3C/svg%3E">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .subtitle {
+            color: #7f8c8d;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .value-display {
+            font-size: 4em;
+            font-weight: bold;
+            padding: 30px;
+            border-radius: 15px;
+            margin: 30px 0;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .value-display.green {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+        }
+
+        .value-display.red {
+            background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+            color: white;
+        }
+
+        .status-text {
+            font-size: 1.3em;
+            margin-top: 20px;
+            font-weight: 600;
+        }
+
+        .status-text.green {
+            color: #27ae60;
+        }
+
+        .status-text.red {
+            color: #e74c3c;
+        }
+
+        .week-info {
+            color: #7f8c8d;
+            margin-top: 20px;
+            font-size: 0.9em;
+        }
+
+        .loading {
+            color: #7f8c8d;
+            font-size: 1.2em;
+        }
+
+        .error {
+            color: #e74c3c;
+            background: #ffe6e6;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            line-height: 1.6;
+            text-align: left;
+            white-space: pre-wrap;
+        }
+        
+        .error a {
+            color: #667eea;
+            text-decoration: underline;
+        }
+
+        .sauna-icon {
+            font-size: 3em;
+            margin-bottom: 20px;
+        }
+
+        .info-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            text-align: left;
+            font-size: 0.9em;
+            color: #2c3e50;
+        }
+
+        .info-section h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            text-align: center;
+        }
+
+        .info-section ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .info-section li {
+            margin: 10px 0;
+            padding-left: 25px;
+            position: relative;
+        }
+
+        .info-section li:before {
+            content: "•";
+            position: absolute;
+            left: 10px;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .info-section a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .info-section a:hover {
+            text-decoration: underline;
+        }
+
+        .warning-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+
+        .sampling-info {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sauna-icon">🏊‍♂️</div>
+        <h1>Havet Arena</h1>
+        <p class="subtitle">Badevilkår denne uken</p>
+        
+        <div id="loading" class="loading">Henter data...</div>
+        
+        <div id="content" style="display: none;">
+            <div id="valueDisplay" class="value-display">-</div>
+            <div id="statusText" class="status-text"></div>
+            <div class="week-info" id="weekInfo"></div>
+        </div>
+        
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div class="info-section">
+            <h3>📋 Om Nyhavna</h3>
+            
+            <div class="sampling-info">
+                <strong>Prøvetaking:</strong><br>
+                • Klima- og miljøenheten: Hver torsdag<br>
+                • Havet Arena: Hver mandag<br>
+                • Resultater publiseres fortløpende (1-2 dager etter prøvetaking)
+            </div>
+
+            <div class="warning-box">
+                <strong>⚠️ Viktig informasjon:</strong><br>
+                Nyhavna har "Dårlig" badevannskvalitet basert på siste 3 år. Ved vedvarende høye bakterieverdier frarådes bading.
+            </div>
+
+            <ul>
+                <li><strong>Anbefaling:</strong> Avvent bading inntil et døgn etter regnvær, spesielt på sentrumsnære strender</li>
+                <li><strong>Grenseverdier for oppfølgingsprøver:</strong>
+                    <ul style="margin-top: 5px; padding-left: 20px;">
+                        <li>E. coli: 500 CFU pr. 100 ml</li>
+                        <li>Intestinale enterokokker: 200 CFU pr. 100 ml (saltvann)</li>
+                    </ul>
+                </li>
+                <li>Dette er en helårsbadeplass med tilrettelagt bading hele året</li>
+            </ul>
+
+            <p style="margin-top: 15px; text-align: center;">
+                <a href="https://www.trondheim.kommune.no/badevannskvalitet" target="_blank">
+                    Se detaljerte resultater hos Trondheim kommune →
+                </a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Google Document/Sheet ID fra URL-en
+        // Dette kan være enten et Google Document eller et Google Sheet
+        // Document: https://docs.google.com/document/d/DOC_ID/edit
+        // Sheet: https://docs.google.com/spreadsheets/d/SHEET_ID/edit
+        const DOC_ID = '1RjJTWQTPRwHtWC-fi1QnelKcpBXXB3eLw7Ld-beK2TE';
+        const IS_DOCUMENT = true; // Sett til false hvis det er et Sheet
+        const DEBUG = false; // Endre til true for feilsøking
+
+        // Hjelpefunksjon for logging som kan skrus av/på
+        function log(...args) {
+            if (DEBUG) {
+                console.log(...args);
+            }
+        }
+        
+        // Hjelpefunksjon for å hente HTML fra dokumentet
+        async function fetchDocumentHTML() {
+            const htmlUrl = `https://docs.google.com/document/d/${DOC_ID}/export?format=html`;
+            log('Henter HTML fra:', htmlUrl);
+            try {
+                const response = await fetch(htmlUrl, {
+                    method: 'GET',
+                    mode: 'cors', // Prøv med 'cors' først
+                    headers: {
+                        'Accept': 'text/html'
+                    }
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}: Kunne ikke hente dokument`);
+                return await response.text();
+            } catch (error) {
+                log('Direkte fetch feilet, prøver via proxy...', error);
+                // Fallback: Prøv via en CORS-proxy hvis direkte kall feiler
+                // Merk: Dette er en offentlig proxy, bruk med varsomhet i produksjon
+                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(htmlUrl)}`;
+                const proxyResponse = await fetch(proxyUrl);
+                if (!proxyResponse.ok) throw new Error(`Proxy HTTP ${proxyResponse.status}: Kunne ikke hente dokument via proxy`);
+                return await proxyResponse.text();
+            }
+        }
+
+        // Hjelpefunksjon for å konvertere HTML til CSV
+        function parseHTMLToCSV(html) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const tables = doc.querySelectorAll('table');
+            
+            log('Antall tabeller funnet:', tables.length);
+            
+            if (tables.length === 0) {
+                log('Ingen <table> elementer funnet, søker etter alternativ struktur...');
+                const allText = doc.body.textContent || doc.body.innerText || '';
+                log('Dokument tekst (første 1000 tegn):', allText.substring(0, 1000));
+                throw new Error('Ingen tabeller funnet i dokumentet. Dokumentet kan ha en annen struktur.');
+            }
+            
+            log(`Fant ${tables.length} tabeller - kombinerer dem`);
+            
+            const csvLines = [];
+            let combinedHeader = null;
+            const dataRows = [];
+            const currentYear = new Date().getFullYear().toString();
+            
+            tables.forEach((table, tableIndex) => {
+                const rows = table.querySelectorAll('tr');
+                log(`Tabell ${tableIndex + 1}: ${rows.length} rader`);
+                
+                let headerRowIndex = 0;
+                if (rows.length > 0) {
+                    const firstRowCells = rows[0].querySelectorAll('td, th');
+                    if (firstRowCells.length > 0) {
+                        const firstCellText = firstRowCells[0].textContent.toLowerCase().trim();
+                        // Bruker dynamisk årstall i stedet for hardkodet '2025'
+                        if (firstCellText.includes('resultater') || firstCellText.includes(currentYear)) {
+                            headerRowIndex = 1;
+                            log(`Tabell ${tableIndex + 1}: Første rad er tittel, bruker rad ${headerRowIndex} som header`);
+                        }
+                    }
+                }
+                
+                rows.forEach((row, rowIndex) => {
+                    if (rowIndex === 0 && headerRowIndex === 1) return;
+                    
+                    const cells = row.querySelectorAll('td, th');
+                    const values = Array.from(cells).map(cell => {
+                        let val = cell.textContent.trim();
+                        if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+                            val = '"' + val.replace(/"/g, '""') + '"';
+                        }
+                        return val;
+                    });
+                    
+                    if (values.length > 0) {
+                        if (rowIndex === headerRowIndex) {
+                            if (combinedHeader === null) {
+                                combinedHeader = [...values];
+                                log(`Header fra tabell ${tableIndex + 1}:`, values.slice(0, 5));
+                            } else {
+                                const weekColumns = values.slice(1);
+                                combinedHeader.push(...weekColumns);
+                            }
+                        } else {
+                            const rowName = values[0].toLowerCase().trim();
+                            const rowData = values.slice(1);
+                            
+                            let dataRowIndex = -1;
+                            if (rowName.includes('havet arena')) dataRowIndex = 0;
+                            else if (rowName.includes('strandveikaia')) dataRowIndex = 1;
+                            
+                            if (dataRowIndex >= 0) {
+                                if (!dataRows[dataRowIndex]) dataRows[dataRowIndex] = [values[0]];
+                                dataRows[dataRowIndex].push(...rowData);
+                            }
+                        }
+                    }
+                });
+            });
+            
+            if (combinedHeader) csvLines.push(combinedHeader.join(','));
+            dataRows.forEach(row => { if (row) csvLines.push(row.join(',')); });
+            
+            return csvLines.join('\n');
+        }
+
+        // Funksjon for å hente data fra Google Document (HTML-parsing)
+        async function fetchDocumentData() {
+            try {
+                // Prøv å hente HTML-versjonen av dokumentet
+                const html = await fetchDocumentHTML();
+                
+                log('HTML mottatt, lengde:', html.length);
+                // Sjekk om HTML inneholder et innebygd Google Sheet
+                const sheetMatch = html.match(/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+                if (sheetMatch) {
+                    log('Fant innebygd Sheet ID i dokumentet:', sheetMatch[1]);
+                }
+                
+                const csv = parseHTMLToCSV(html);
+                log('CSV generert, antall linjer:', csv.split('\n').length);
+                
+                return csv;
+            } catch (error) {
+                console.error('Feil ved henting av dokument:', error);
+                throw error;
+            }
+        }
+        
+        // Funksjon for å få ukenummer (ISO 8601 standard)
+        function getWeekNumber(date) {
+            const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+            const dayNum = d.getUTCDay() || 7;
+            d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+            const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+            return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+        }
+
+        // Funksjon for å parse CSV (håndterer kommaer i celler)
+        function parseCSV(text) {
+            const lines = [];
+            let currentLine = [];
+            let currentField = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    currentLine.push(currentField.trim());
+                    currentField = '';
+                } else if (char === '\n' && !inQuotes) {
+                    currentLine.push(currentField.trim());
+                    if (currentLine.length > 0 && currentLine.some(cell => cell !== '')) {
+                        lines.push(currentLine);
+                    }
+                    currentLine = [];
+                    currentField = '';
+                } else {
+                    currentField += char;
+                }
+            }
+            
+            if (currentField || currentLine.length > 0) {
+                currentLine.push(currentField.trim());
+                if (currentLine.length > 0 && currentLine.some(cell => cell !== '')) {
+                    lines.push(currentLine);
+                }
+            }
+            
+            return lines;
+        }
+
+        // Funksjon for å hente data fra Google Sheets eller Documents
+        async function fetchSheetData() {
+            try {
+                // Hvis det er et Document, bruk Document-metoden
+                if (IS_DOCUMENT) {
+                    log('Henter data fra Google Document...');
+                    try {
+                        const csvText = await fetchDocumentData();
+                        const lines = parseCSV(csvText);
+                        log('CSV parset, antall linjer:', lines.length);
+                        if (lines.length > 0) {
+                            log('Første linje:', lines[0]);
+                            log('Andre linje:', lines.length > 1 ? lines[1] : 'Ingen');
+                        }
+                        return processSheetData(lines);
+                    } catch (docError) {
+                        console.error('Feil ved henting av Document:', docError);
+                        // Prøv alternativ metode - hent som plain text
+                        log('Prøver alternativ metode...');
+                        try {
+                            const textUrl = `https://docs.google.com/document/d/${DOC_ID}/export?format=txt`;
+                            const textResponse = await fetch(textUrl);
+                            if (textResponse.ok) {
+                                const text = await textResponse.text();
+                                log('Plain text mottatt, lengde:', text.length);
+                                log('Første 1000 tegn:', text.substring(0, 1000));
+                                // Prøv å parse som CSV hvis det ser ut som CSV
+                                const lines = parseCSV(text);
+                                if (lines.length > 0) {
+                                    return processSheetData(lines);
+                                }
+                            }
+                        } catch (textError) {
+                            console.error('Alternativ metode feilet også:', textError);
+                        }
+                        throw docError;
+                    }
+                }
+                
+                // Hvis det er et Sheet, bruk Sheet-metoden
+                log('Henter data fra Google Sheet...');
+                // Prøv flere URL-formater for å hente CSV fra offentlige Sheets
+                const urls = [
+                    // Standard export-format
+                    `https://docs.google.com/spreadsheets/d/${DOC_ID}/export?format=csv&gid=0`,
+                    // Uten gid (bruker første ark)
+                    `https://docs.google.com/spreadsheets/d/${DOC_ID}/export?format=csv`,
+                    // Google Visualization API format
+                    `https://docs.google.com/spreadsheets/d/${DOC_ID}/gviz/tq?tqx=out:csv&gid=0`,
+                    // Uten gid i gviz
+                    `https://docs.google.com/spreadsheets/d/${DOC_ID}/gviz/tq?tqx=out:csv`,
+                    // Med sheet=0 parameter
+                    `https://docs.google.com/spreadsheets/d/${DOC_ID}/export?format=csv&sheet=0`
+                ];
+                
+                let csvText = null;
+                let lastError = null;
+                let lastStatus = null;
+                
+                // Prøv hver URL til en fungerer
+                for (const csvUrl of urls) {
+                    try {
+                        log('Prøver URL:', csvUrl);
+                        const response = await fetch(csvUrl, {
+                            method: 'GET',
+                            mode: 'cors',
+                            redirect: 'follow'
+                        });
+                        
+                        lastStatus = response.status;
+                        
+                        if (response.ok) {
+                            csvText = await response.text();
+                            log('Fikk respons, lengde:', csvText.length);
+                            
+                            // Sjekk om vi faktisk fikk CSV-data (ikke en HTML-feilside)
+                            if (csvText && 
+                                csvText.length > 0 && 
+                                !csvText.includes('<html') && 
+                                !csvText.includes('<!DOCTYPE') &&
+                                !csvText.includes('Sign in') &&
+                                !csvText.includes('Access denied')) {
+                                log('CSV-data funnet!');
+                                break;
+                            } else {
+                                log('Fikk HTML i stedet for CSV');
+                                csvText = null;
+                            }
+                        } else {
+                            log('Response ikke OK:', response.status, response.statusText);
+                        }
+                    } catch (err) {
+                        log('Feil ved henting:', err.message);
+                        lastError = err;
+                        continue;
+                    }
+                }
+                
+                if (!csvText) {
+                    // Prøv å hente via JSON og konverter til CSV
+                    try {
+                        log('Prøver JSON-alternativ...');
+                        const jsonUrl = `https://docs.google.com/spreadsheets/d/${DOC_ID}/gviz/tq?tqx=out:json&gid=0`;
+                        const jsonResponse = await fetch(jsonUrl);
+                        
+                        if (jsonResponse.ok) {
+                            const jsonText = await jsonResponse.text();
+                            // Fjern Google's wrapper: )]}'\n
+                            const cleanJson = jsonText.replace(/^\)\]\}'\n/, '');
+                            const data = JSON.parse(cleanJson);
+                            
+                            // Konverter JSON til CSV
+                            if (data.table && data.table.rows) {
+                                const rows = data.table.rows;
+                                const csvLines = [];
+                                
+                                // Legg til headers hvis de finnes
+                                if (data.table.cols) {
+                                    const headers = data.table.cols.map(col => col.label || '');
+                                    csvLines.push(headers.join(','));
+                                }
+                                
+                                // Legg til rader
+                                rows.forEach(row => {
+                                    const values = row.c.map(cell => {
+                                        if (!cell || cell.v === null || cell.v === undefined) return '';
+                                        // Escape kommaer og anførselstegn
+                                        const val = String(cell.v);
+                                        if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+                                            return '"' + val.replace(/"/g, '""') + '"';
+                                        }
+                                        return val;
+                                    });
+                                    csvLines.push(values.join(','));
+                                });
+                                
+                                csvText = csvLines.join('\n');
+                                log('Konvertert JSON til CSV');
+                            }
+                        }
+                    } catch (jsonErr) {
+                        log('JSON-alternativ feilet:', jsonErr);
+                    }
+                }
+                
+                if (!csvText) {
+                    // Sjekk om Document/Sheet ID-en faktisk eksisterer
+                    const docUrl = IS_DOCUMENT 
+                        ? `https://docs.google.com/document/d/${DOC_ID}`
+                        : `https://docs.google.com/spreadsheets/d/${DOC_ID}`;
+                    let errorDetails = `HTTP ${lastStatus || '404'}: Kunne ikke hente data.\n\n`;
+                    errorDetails += `${IS_DOCUMENT ? 'Document' : 'Sheet'} ID: ${DOC_ID}\n\n`;
+                    errorDetails += `⚠️ ${IS_DOCUMENT ? 'Dokumentet' : 'Regnearket'} finnes ikke eller er ikke tilgjengelig.\n\n`;
+                    errorDetails += `Sjekk:\n`;
+                    errorDetails += `• Er ID-en korrekt?\n`;
+                    errorDetails += `• Er ${IS_DOCUMENT ? 'dokumentet' : 'regnearket'} offentlig? (Anyone with the link can view)\n`;
+                    errorDetails += `• Prøv å åpne dette i nettleseren: ${docUrl}\n\n`;
+                    errorDetails += `💡 For å finne riktig ID:\n`;
+                    errorDetails += `1. Åpne ${IS_DOCUMENT ? 'dokumentet' : 'regnearket'} i Google\n`;
+                    errorDetails += `2. Se i URL-en etter /d/ID/\n`;
+                    errorDetails += `3. Kopier ID-en og oppdater konstanten DOC_ID i koden`;
+                    
+                    throw new Error(errorDetails);
+                }
+                
+                const lines = parseCSV(csvText);
+                return processSheetData(lines);
+                
+            } catch (error) {
+                console.error('Feil ved henting av data:', error);
+                throw error;
+            }
+        }
+        
+        // Funksjon for å prosessere CSV-data og finne uke-verdi
+        function processSheetData(lines) {
+            if (lines.length === 0) {
+                throw new Error('Dataene er tomme');
+            }
+            
+            // Finn gjeldende uke
+            const currentDate = new Date();
+            const currentWeek = getWeekNumber(currentDate);
+            const currentYear = currentDate.getFullYear();
+            
+            console.log('Søker etter uke:', currentWeek, 'i år:', currentYear);
+            console.log('Antall rader i data:', lines.length);
+            
+            // Log alle rader for debugging (første 10 rader)
+            console.log('Første 10 rader i data:');
+            for (let i = 0; i < Math.min(10, lines.length); i++) {
+                console.log(`Rad ${i}:`, lines[i]);
+            }
+            
+            // Finn header-raden som inneholder uke-kolonner
+            // Strukturen ser ut til å være:
+            // Rad 0: "Resultater for 2025" (kan hoppes over)
+            // Rad 1: "Prøvepunkt | Uke 1 | Uke 2 | ..." (header-rad)
+            // Rad 2+: Data-rader med "Havet Arena", "Strandveikaia", osv.
+            
+            let headerRowIndex = -1;
+            let weekColumnIndex = -1;
+            let havetArenaRowIndex = -1;
+            const foundWeeks = [];
+            
+            // Finn header-raden (den som inneholder "Prøvepunkt" og uke-kolonner)
+            for (let i = 0; i < lines.length; i++) {
+                const row = lines[i];
+                // Sjekk om raden inneholder "Prøvepunkt" OG minst én celle med "Uke" eller "Week"
+                // Dette er mer robust enn å lete etter spesifikt "Uke 1"
+                const rowText = row.join(' ').toLowerCase();
+                if (rowText.includes('prøvepunkt') && (rowText.includes('uke') || rowText.includes('week'))) {
+                    headerRowIndex = i;
+                    log('Fant header-rad på indeks:', i);
+                    break;
+                }
+            }
+            
+            if (headerRowIndex === -1) {
+                // Fallback: Prøv gammel metode hvis "Prøvepunkt" mangler
+                log('Fant ikke "Prøvepunkt", prøver fallback-søk etter "Uke 1"...');
+                for (let i = 0; i < lines.length; i++) {
+                    const row = lines[i];
+                    for (let j = 0; j < row.length; j++) {
+                        const cell = row[j].toLowerCase().trim();
+                        if (cell.includes('uke 1') || cell.includes('week 1')) {
+                            headerRowIndex = i;
+                            break;
+                        }
+                    }
+                    if (headerRowIndex !== -1) break;
+                }
+            }
+            
+            if (headerRowIndex === -1) {
+                throw new Error('Kunne ikke finne header-rad med uke-kolonner');
+            }
+            
+            const headerRow = lines[headerRowIndex];
+            console.log('Header-rad:', headerRow);
+            console.log('Header-rad lengde:', headerRow.length);
+            console.log('Første 20 kolonner i header:', headerRow.slice(0, 20));
+            
+            // Først: Samle alle uke-verdier og deres kolonne-indekser
+            const weekColumns = []; // Array av {week: number, columnIndex: number}
+            
+            for (let j = 0; j < headerRow.length; j++) {
+                const headerCell = headerRow[j].toLowerCase().trim();
+                
+                // Prøv å finne uke-nummeret i header-cell
+                const weekMatch = headerCell.match(/(?:uke|week)\s*(\d+)/i);
+                if (weekMatch) {
+                    const weekNum = parseInt(weekMatch[1]);
+                    foundWeeks.push(weekNum);
+                    weekColumns.push({ week: weekNum, columnIndex: j });
+                    console.log(`Fant uke ${weekNum} på kolonne-indeks ${j} (cell: "${headerRow[j]}")`);
+                } else if (j < 20) {
+                    // Log første 20 celler som ikke matcher for debugging
+                    console.log(`Kolonne ${j} er ikke en uke: "${headerRow[j]}"`);
+                }
+            }
+            
+            console.log('Alle funnede uker:', weekColumns.map(w => `Uke ${w.week} (kol ${w.columnIndex})`).join(', '));
+            console.log(`Søker etter uke ${currentWeek}. Funnet ${weekColumns.length} uke-kolonner totalt.`);
+            
+            // Vis hele header-raden for debugging
+            console.log('Header-rad lengde:', headerRow.length);
+            console.log('Header-rad (første 20 og siste 10):', 
+                headerRow.slice(0, 20).join(' | '), 
+                '...', 
+                headerRow.slice(-10).join(' | '));
+            
+            // Sjekk spesifikt om uke 50 finnes
+            const week50 = weekColumns.find(w => w.week === 50);
+            if (week50) {
+                console.log(`✅ Uke 50 funnet på kolonne ${week50.columnIndex}! Header-cell: "${headerRow[week50.columnIndex]}"`);
+            } else {
+                const maxWeek = Math.max(...weekColumns.map(w => w.week), 0);
+                const minWeek = Math.min(...weekColumns.map(w => w.week), 0);
+                console.log(`❌ Uke 50 ikke funnet. Høyeste uke funnet: ${maxWeek}, Laveste: ${minWeek}`);
+                console.log(`Uker nær 50:`, weekColumns.filter(w => w.week >= 45 && w.week <= 52).map(w => `Uke ${w.week}`).join(', '));
+                console.log(`Alle uker sortert:`, weekColumns.map(w => w.week).sort((a, b) => a - b).join(', '));
+            }
+            
+            // Sjekk også om currentWeek faktisk er 50
+            console.log(`Current week er: ${currentWeek}`);
+            
+            // Finn beste match: eksakt match først, deretter nærmeste
+            let bestMatch = null;
+            
+            // Først: Direkte søk i header-raden for å finne uke 50 (eller currentWeek)
+            // Dette er en fallback hvis parsing-logikken ikke fungerer
+            console.log(`Søker direkte i header-raden etter "Uke ${currentWeek}"...`);
+            for (let j = 0; j < headerRow.length; j++) {
+                const cell = headerRow[j].toLowerCase().trim();
+                // Sjekk om cellen inneholder "uke 50" eller lignende
+                if (cell.includes(`uke ${currentWeek}`) || cell.includes(`week ${currentWeek}`)) {
+                    // Sjekk om vi allerede har denne uken i weekColumns
+                    let existing = weekColumns.find(wc => wc.columnIndex === j);
+                    if (!existing) {
+                        // Legg til hvis den ikke finnes
+                        const weekObj = { week: currentWeek, columnIndex: j };
+                        weekColumns.push(weekObj);
+                        foundWeeks.push(currentWeek);
+                        console.log(`✅ Fant uke ${currentWeek} direkte i header-raden på kolonne ${j}!`);
+                        existing = weekObj;
+                    }
+                    bestMatch = existing;
+                    console.log(`✅ Bruker uke ${currentWeek} fra kolonne ${j}`);
+                    break;
+                }
+            }
+            
+            // Hvis vi ikke fant det direkte, prøv eksakt match i weekColumns
+            if (!bestMatch) {
+                console.log(`Søker etter eksakt match for uke ${currentWeek} i weekColumns...`);
+                for (const wc of weekColumns) {
+                    if (wc.week === currentWeek) {
+                        bestMatch = wc;
+                        console.log(`✅ Fant eksakt match: uke ${currentWeek} på kolonne ${wc.columnIndex}`);
+                        break;
+                    }
+                }
+            }
+            
+            if (!bestMatch) {
+                console.log(`❌ Ingen eksakt match funnet for uke ${currentWeek}`);
+                console.log(`Tilgjengelige uker nær ${currentWeek}:`, 
+                    weekColumns
+                        .filter(w => Math.abs(w.week - currentWeek) <= 10)
+                        .map(w => `Uke ${w.week}`)
+                        .join(', '));
+            }
+            
+            // Hvis ingen eksakt match, finn nærmeste (innenfor ±1 uke først, deretter nærmeste uansett)
+            if (!bestMatch) {
+                // Prøv først ±1 uke (prioriter neste uke over forrige)
+                let weekPlus1 = null;
+                let weekMinus1 = null;
+                
+                for (const wc of weekColumns) {
+                    if (wc.week === currentWeek + 1) {
+                        weekPlus1 = wc;
+                    } else if (wc.week === currentWeek - 1) {
+                        weekMinus1 = wc;
+                    }
+                }
+                
+                if (weekPlus1) {
+                    bestMatch = weekPlus1;
+                    console.log(`Fant nærmeste match (+1): uke ${weekPlus1.week} på kolonne ${weekPlus1.columnIndex}`);
+                } else if (weekMinus1) {
+                    bestMatch = weekMinus1;
+                    console.log(`Fant nærmeste match (-1): uke ${weekMinus1.week} på kolonne ${weekMinus1.columnIndex}`);
+                }
+                
+                // Hvis fortsatt ingen match, finn absolutt nærmeste
+                // Prioriter uker som er nærmere nåtiden (høyere uke-nummer hvis like langt unna)
+                if (!bestMatch && weekColumns.length > 0) {
+                    // Først: Prøv å finne uker som er høyere enn currentWeek (fremtidige uker)
+                    // Dette er viktig fordi vi vil ha nyeste data
+                    const futureWeeks = weekColumns
+                        .filter(wc => wc.week > currentWeek)
+                        .sort((a, b) => a.week - b.week); // Sorter stigende
+                    
+                    if (futureWeeks.length > 0) {
+                        // Bruk nærmeste fremtidige uke
+                        bestMatch = futureWeeks[0];
+                        console.log(`Fant nærmeste fremtidige uke: uke ${bestMatch.week} på kolonne ${bestMatch.columnIndex}`);
+                    } else {
+                        // Hvis ingen fremtidige uker, finn nærmeste uke (fortsatt eller fortid)
+                        let minDiff = Infinity;
+                        let candidates = [];
+                        
+                        for (const wc of weekColumns) {
+                            const diff = Math.abs(wc.week - currentWeek);
+                            if (diff < minDiff) {
+                                minDiff = diff;
+                                candidates = [wc];
+                            } else if (diff === minDiff) {
+                                candidates.push(wc);
+                            }
+                        }
+                        
+                        // Hvis flere kandidater med samme avstand, velg den med høyest uke-nummer (nyeste)
+                        if (candidates.length > 0) {
+                            bestMatch = candidates.reduce((prev, curr) => curr.week > prev.week ? curr : prev);
+                            console.log(`Fant nærmeste match: uke ${bestMatch.week} på kolonne ${bestMatch.columnIndex} (forskjell: ${minDiff} uker)`);
+                        }
+                    }
+                }
+            }
+            
+            if (!bestMatch) {
+                const uniqueWeeks = [...new Set(foundWeeks)].sort((a, b) => a - b);
+                throw new Error(`Kunne ikke finne kolonne for uke ${currentWeek}. Tilgjengelige uker: ${uniqueWeeks.join(', ')}`);
+            }
+            
+            weekColumnIndex = bestMatch.columnIndex;
+            console.log(`✅ Bruker uke ${bestMatch.week} på kolonne-indeks ${weekColumnIndex} (søkte etter uke ${currentWeek})`);
+            
+            // Viktig: Hvis vi ikke fant eksakt match, gi en advarsel
+            if (bestMatch.week !== currentWeek) {
+                console.warn(`⚠️ ADVARSEL: Fant ikke eksakt match for uke ${currentWeek}. Bruker uke ${bestMatch.week} i stedet.`);
+                console.warn(`Dette kan bety at uke ${currentWeek} ikke finnes i dataene, eller at kombineringslogikken ikke fungerer riktig.`);
+            }
+            
+            // Finn raden for "Havet Arena"
+            for (let i = headerRowIndex + 1; i < lines.length; i++) {
+                const row = lines[i];
+                if (row.length > 0) {
+                    const firstCell = row[0].toLowerCase().trim();
+                    // Mer robust sjekk for "Havet Arena" (tåler ekstra mellomrom etc.)
+                    if (firstCell.includes('havet') && firstCell.includes('arena')) {
+                        havetArenaRowIndex = i;
+                        log('Fant Havet Arena-rad på indeks:', i);
+                        break;
+                    }
+                }
+            }
+            
+            if (havetArenaRowIndex === -1) {
+                throw new Error('Kunne ikke finne rad for "Havet Arena"');
+            }
+            
+            // Hent verdien fra riktig kolonne i Havet Arena-raden
+            const havetArenaRow = lines[havetArenaRowIndex];
+            if (havetArenaRow.length <= weekColumnIndex) {
+                throw new Error(`Havet Arena-rad har ikke nok kolonner (har ${havetArenaRow.length}, trenger ${weekColumnIndex + 1})`);
+            }
+            
+            const valueStr = havetArenaRow[weekColumnIndex].trim();
+            log(`Verdi fra kolonne ${weekColumnIndex} (uke ${currentWeek}):`, valueStr);
+            
+            // Håndter spesielle verdier som "*", ">2420", osv.
+            let foundValue = null;
+            
+            // Funksjon for å rense og parse verdi
+            const parseValue = (val) => {
+                if (!val || val === '*' || val === '-') return null;
+                let clean = val;
+                if (clean.startsWith('>')) clean = clean.substring(1);
+                clean = clean.replace(/[^\d.-]/g, '');
+                const num = parseFloat(clean);
+                return isNaN(num) ? null : num;
+            };
+
+            foundValue = parseValue(valueStr);
+            
+            // Hvis vi ikke fant verdi for gjeldende uke, prøv forrige uke
+            let actualWeek = bestMatch ? bestMatch.week : currentWeek;
+            
+            if (foundValue === null) {
+                log(`Ingen verdi funnet for uke ${currentWeek}, prøver forrige uke...`);
+                
+                // Finn forrige uke i weekColumns
+                const prevWeek = currentWeek - 1;
+                const prevWeekMatch = weekColumns.find(w => w.week === prevWeek);
+                
+                if (prevWeekMatch) {
+                    const prevValueStr = havetArenaRow[prevWeekMatch.columnIndex].trim();
+                    const prevValue = parseValue(prevValueStr);
+                    
+                    if (prevValue !== null) {
+                        foundValue = prevValue;
+                        actualWeek = prevWeek;
+                        log(`Fant verdi for forrige uke (${prevWeek}):`, foundValue);
+                    }
+                }
+            }
+            
+            // Hvis vi ikke fant noe, vis hvilke uker som faktisk finnes
+            const uniqueWeeks = [...new Set(foundWeeks)].sort((a, b) => a - b);
+            if (foundValue === null) {
+                log('Fant ingen verdi. Tilgjengelige uker i data:', uniqueWeeks);
+                log('Søkte etter uke:', currentWeek);
+                
+                // Hvis verdien er null fordi det var "*" eller lignende, gi en annen melding
+                if (valueStr === '*' || valueStr === '' || valueStr === '-') {
+                    return {
+                        value: null,
+                        error: `Ingen verdi registrert for uke ${currentWeek} (markert som "${valueStr}"). Tilgjengelige uker i data: ${uniqueWeeks.join(', ')}`,
+                        availableWeeks: uniqueWeeks,
+                        searchedWeek: currentWeek
+                    };
+                }
+                
+                // Hvis vi ikke fant noen uker i det hele tatt, vis rådataene
+                let debugInfo = '';
+                if (uniqueWeeks.length === 0) {
+                    debugInfo = '\n\n🔍 Debug-info:\n';
+                    debugInfo += `• Antall rader: ${lines.length}\n`;
+                    debugInfo += `• Header-rad indeks: ${headerRowIndex}\n`;
+                    debugInfo += `• Uke-kolonne indeks: ${weekColumnIndex}\n`;
+                    debugInfo += `• Havet Arena-rad indeks: ${havetArenaRowIndex}\n`;
+                    debugInfo += '\nFørste 5 rader:\n';
+                    for (let i = 0; i < Math.min(5, lines.length); i++) {
+                        debugInfo += `  Rad ${i}: ${lines[i].join(' | ')}\n`;
+                    }
+                    debugInfo += '\n💡 Sjekk konsollen (F12) for mer detaljer.';
+                }
+                
+                // Returner et objekt med feilinfo
+                return {
+                    value: null,
+                    error: `Kunne ikke finne verdi for uke ${currentWeek}.${uniqueWeeks.length > 0 ? ' Tilgjengelige uker i data: ' + uniqueWeeks.join(', ') : ' Ingen uke-verdier funnet i dataene.'}${debugInfo}`,
+                    availableWeeks: uniqueWeeks,
+                    searchedWeek: currentWeek,
+                    rawData: lines.slice(0, 10) // Lagre første 10 rader for debugging
+                };
+            }
+            
+            return {
+                value: foundValue,
+                availableWeeks: uniqueWeeks,
+                searchedWeek: currentWeek,
+                actualWeek: actualWeek // Hvilken uke som faktisk ble brukt
+            };
+        }
+
+        // Funksjon for å oppdatere UI
+        function updateUI(result) {
+            const loading = document.getElementById('loading');
+            const content = document.getElementById('content');
+            const valueDisplay = document.getElementById('valueDisplay');
+            const statusText = document.getElementById('statusText');
+            const weekInfo = document.getElementById('weekInfo');
+            const error = document.getElementById('error');
+            
+            loading.style.display = 'none';
+            error.style.display = 'none';
+            
+            // Håndter både gammelt format (bare tall) og nytt format (objekt)
+            let value = null;
+            let errorMessage = null;
+            let availableWeeks = null;
+            let actualWeek = null;
+            
+            if (typeof result === 'object' && result !== null) {
+                value = result.value;
+                errorMessage = result.error;
+                availableWeeks = result.availableWeeks;
+                actualWeek = result.actualWeek;
+            } else {
+                value = result;
+            }
+            
+            if (value === null || isNaN(value)) {
+                error.style.display = 'block';
+                if (errorMessage) {
+                    error.innerHTML = errorMessage.replace(/\n/g, '<br>');
+                } else {
+                    const currentWeek = getWeekNumber(new Date());
+                    error.textContent = 'Kunne ikke finne verdi for gjeldende uke. Sjekk at regnearket har data for uke ' + currentWeek + '.';
+                }
+                return;
+            }
+            
+            content.style.display = 'block';
+            
+            const currentDate = new Date();
+            const currentWeek = getWeekNumber(currentDate);
+            
+            valueDisplay.textContent = Math.round(value);
+            
+            if (value >= 1000) {
+                valueDisplay.className = 'value-display red';
+                statusText.textContent = '⚠️ Ikke anbefalt for bading';
+                statusText.className = 'status-text red';
+            } else {
+                valueDisplay.className = 'value-display green';
+                statusText.textContent = '✅ Trygt for bading';
+                statusText.className = 'status-text green';
+            }
+            
+            // Vis hvilken uke som faktisk ble brukt
+            const weekToShow = actualWeek !== null && actualWeek !== undefined ? actualWeek : currentWeek;
+            if (actualWeek !== null && actualWeek !== currentWeek) {
+                weekInfo.textContent = `Uke ${weekToShow} (søkte etter uke ${currentWeek}), ${currentDate.getFullYear()}`;
+            } else {
+                weekInfo.textContent = `Uke ${weekToShow}, ${currentDate.getFullYear()}`;
+            }
+        }
+
+        // Funksjon for å rapportere feil til ekstern tjeneste (Stub)
+        async function logErrorToService(error) {
+            // TODO: Legg inn din webhook URL her (f.eks. Google Forms, Slack, Discord, Zapier)
+            // const WEBHOOK_URL = 'DIN_WEBHOOK_URL_HER';
+            
+            // Hvis ingen URL er satt, bare logg til konsollen
+            log('⚠️ Feil oppdaget! Ville sendt varsel hvis WEBHOOK_URL var konfigurert.');
+            log('Feilmelding:', error.message);
+            
+            /* Eksempel på implementering:
+            if (WEBHOOK_URL) {
+                try {
+                    await fetch(WEBHOOK_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            timestamp: new Date().toISOString(),
+                            error: error.message,
+                            userAgent: navigator.userAgent
+                        })
+                    });
+                } catch (e) {
+                    console.error('Kunne ikke sende feilrapport:', e);
+                }
+            }
+            */
+        }
+
+        // Last inn data når siden laster
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const value = await fetchSheetData();
+                updateUI(value);
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+                let errorMsg = error.message;
+                
+                // Rapporter feil
+                logErrorToService(error);
+                
+                // Konverter linjeskift til HTML for bedre visning
+                errorMsg = errorMsg.replace(/\n/g, '<br>');
+                
+                // Hvis feilmeldingen allerede inneholder detaljerte instruksjoner, vis den som HTML
+                if (errorMsg.includes('<br>')) {
+                    document.getElementById('error').innerHTML = errorMsg;
+                } else {
+                    document.getElementById('error').textContent = errorMsg;
+                }
+            }
+        });
+    </script>
+</body>
+</html>
+
+
