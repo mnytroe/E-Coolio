@@ -236,6 +236,8 @@
         const DEBUG = false; // Endre til true for feilsøking
         let CURRENT_REQUEST_ID = 0; // Brukes til å unngå race condition ved flere samtidige kall
         const THRESHOLD_ECOLI = 1000; // Konfigurerbar grense for advarsel
+        const CACHE_KEY = 'havet_arena_data';
+        const CACHE_DURATION = 1000 * 60 * 60; // 1 time
 
         // Hjelpefunksjon for fetch med timeout, slik at proxy-feil ikke henger
         async function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
@@ -1098,11 +1100,40 @@
             */
         }
 
+        // Enkel cache for å unngå unødvendige requests
+        async function fetchWithCache() {
+            try {
+                const cachedRaw = localStorage.getItem(CACHE_KEY);
+                if (cachedRaw) {
+                    const { data, timestamp } = JSON.parse(cachedRaw);
+                    if (Date.now() - timestamp < CACHE_DURATION) {
+                        log('Bruker cached data');
+                        return data;
+                    }
+                }
+            } catch (e) {
+                log('Klarte ikke lese cache:', e);
+            }
+
+            const data = await fetchSheetData();
+
+            try {
+                localStorage.setItem(CACHE_KEY, JSON.stringify({
+                    data,
+                    timestamp: Date.now()
+                }));
+            } catch (e) {
+                log('Klarte ikke skrive cache:', e);
+            }
+
+            return data;
+        }
+
         // Last inn data når siden laster
         document.addEventListener('DOMContentLoaded', async () => {
             try {
                 const myRequestId = ++CURRENT_REQUEST_ID; // Marker denne forespørselen som "siste"
-                const value = await fetchSheetData();
+                const value = await fetchWithCache();
                 // Hvis det har kommet en nyere forespørsel mens vi ventet,
                 // skal ikke denne lenger oppdatere UI-et.
                 if (myRequestId === CURRENT_REQUEST_ID) {
