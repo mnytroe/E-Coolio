@@ -320,7 +320,7 @@
             DEBUG: false,
             CACHE_KEY: 'havet_arena_data',
             CACHE_DURATION: 1000 * 60 * 60, // 1 time
-            CACHE_VERSION: 3, // bump denne hvis datastruktur endres
+            CACHE_VERSION: 4, // bump denne hvis datastruktur endres
             THRESHOLD_HIGH: 1000, // CFU/100ml
             RETRY_ATTEMPTS: 3,
             RETRY_DELAY: 1000
@@ -398,6 +398,17 @@
         // Hjelpefunksjon for å konvertere HTML til CSV
         // Velger alltid tabeller for riktig år (inneværende år hvis mulig, ellers siste år i dokumentet)
         function parseHTMLToCSV(html) {
+            // Klipp bort alt innhold fra og med "Resultater for 2024"
+            // slik at vi kun har 2025-seksjonen i dokumentet.
+            const cutoffMarker = 'Resultater for 2024';
+            const cutoffIndex = html.indexOf(cutoffMarker);
+            if (cutoffIndex !== -1) {
+                log(`Fant "${cutoffMarker}" i HTML på posisjon ${cutoffIndex} – klipper bort alt etter dette (2024-data ignoreres).`);
+                html = html.slice(0, cutoffIndex);
+            } else {
+                log(`Fant ikke "${cutoffMarker}" i HTML – bruker hele dokumentet.`);
+            }
+
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
             const allTables = Array.from(doc.querySelectorAll('table'));
@@ -989,18 +1000,19 @@
             foundValue = parsed.value;
             isEstimate = parsed.isEstimate;
             
-            // Hvis vi ikke fant verdi for gjeldende uke, prøv forrige uke
+            // Hvis vi ikke fant verdi for gjeldende uke, prøv KUN forrige uke
             let actualWeek = bestMatch ? bestMatch.week : currentWeek;
             
             if (foundValue === null) {
                 log(`Ingen verdi funnet for uke ${currentWeek}, prøver forrige uke...`);
                 
-                // Finn forrige uke i weekColumns
                 const prevWeek = currentWeek - 1;
                 const prevWeekMatch = weekColumns.find(w => w.week === prevWeek);
                 
                 if (prevWeekMatch) {
-                    const prevValueStr = havetArenaRow[prevWeekMatch.columnIndex].trim();
+                    const prevValueStr = havetArenaRow[prevWeekMatch.columnIndex]
+                        ? havetArenaRow[prevWeekMatch.columnIndex].trim()
+                        : '';
                     const prevParsed = parseValue(prevValueStr);
                     
                     if (prevParsed.value !== null) {
