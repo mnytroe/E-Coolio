@@ -782,13 +782,13 @@
             const currentDate = new Date();
             const { week: currentWeek, year: currentYear } = getWeekNumber(currentDate);
             
-            console.log('Søker etter uke:', currentWeek, 'i år:', currentYear);
-            console.log('Antall rader i data:', lines.length);
+            log('Søker etter uke:', currentWeek, 'i år:', currentYear);
+            log('Antall rader i data:', lines.length);
             
             // Log alle rader for debugging (første 10 rader)
-            console.log('Første 10 rader i data:');
+            log('Første 10 rader i data:');
             for (let i = 0; i < Math.min(10, lines.length); i++) {
-                console.log(`Rad ${i}:`, lines[i]);
+                log(`Rad ${i}:`, lines[i]);
             }
             
             // Finn header-raden som inneholder uke-kolonner
@@ -836,9 +836,9 @@
             }
             
             const headerRow = lines[headerRowIndex];
-            console.log('Header-rad:', headerRow);
-            console.log('Header-rad lengde:', headerRow.length);
-            console.log('Første 20 kolonner i header:', headerRow.slice(0, 20));
+            log('Header-rad:', headerRow);
+            log('Header-rad lengde:', headerRow.length);
+            log('Første 20 kolonner i header:', headerRow.slice(0, 20));
             
             // Først: Samle alle uke-verdier og deres kolonne-indekser.
             // Dersom samme uke finnes flere ganger (f.eks. flere år), lar vi SISTE forekomst vinne
@@ -854,26 +854,26 @@
                     const weekNum = parseInt(weekMatch[1]);
                     foundWeeks.push(weekNum);
                     weekColumnByWeek[weekNum] = { week: weekNum, columnIndex: j };
-                    console.log(`Fant uke ${weekNum} på kolonne-indeks ${j} (cell: "${headerRow[j]}")`);
+                    log(`Fant uke ${weekNum} på kolonne-indeks ${j} (cell: "${headerRow[j]}")`);
                 } else if (j < 20) {
                     // Log første 20 celler som ikke matcher for debugging
-                    console.log(`Kolonne ${j} er ikke en uke: "${headerRow[j]}"`);
+                    log(`Kolonne ${j} er ikke en uke: "${headerRow[j]}"`);
                 }
             }
             
             const weekColumns = Object.values(weekColumnByWeek);
-            console.log('Alle funnede uker (etter at siste forekomst per uke vinner):', weekColumns.map(w => `Uke ${w.week} (kol ${w.columnIndex})`).join(', '));
-            console.log(`Søker etter uke ${currentWeek}. Funnet ${weekColumns.length} uke-kolonner totalt.`);
+            log('Alle funnede uker (etter at siste forekomst per uke vinner):', weekColumns.map(w => `Uke ${w.week} (kol ${w.columnIndex})`).join(', '));
+            log(`Søker etter uke ${currentWeek}. Funnet ${weekColumns.length} uke-kolonner totalt.`);
             
             // Vis hele header-raden for debugging
-            console.log('Header-rad lengde:', headerRow.length);
-            console.log('Header-rad (første 20 og siste 10):', 
+            log('Header-rad lengde:', headerRow.length);
+            log('Header-rad (første 20 og siste 10):', 
                 headerRow.slice(0, 20).join(' | '), 
                 '...', 
                 headerRow.slice(-10).join(' | '));
             
             // Sjekk også hvilken uke vi faktisk er i
-            console.log(`Current week er: ${currentWeek}`);
+            log(`Current week er: ${currentWeek}`);
             
             const bestMatch = findBestWeekMatch(weekColumns, currentWeek);
             
@@ -883,7 +883,7 @@
             }
             
             weekColumnIndex = bestMatch.columnIndex;
-            console.log(`✅ Bruker uke ${bestMatch.week} på kolonne-indeks ${weekColumnIndex} (søkte etter uke ${currentWeek}) — matchType: ${bestMatch.matchType}`);
+            log(`✅ Bruker uke ${bestMatch.week} på kolonne-indeks ${weekColumnIndex} (søkte etter uke ${currentWeek}) — matchType: ${bestMatch.matchType}`);
             
             // Viktig: Hvis vi ikke fant eksakt match, gi en advarsel
             if (bestMatch.matchType !== 'exact') {
