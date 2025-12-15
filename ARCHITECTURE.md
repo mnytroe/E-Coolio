@@ -1,6 +1,11 @@
 ## Datakilde og arkitektur – Havet Arena badevann
 
-Denne siden leser **ukentlige E. coli‑verdier for Havet Arena** direkte fra et offentlig **Google‑dokument** (ikke regneark) og gjør minimal behandling i nettleseren.
+### Tech stack & kontekst
+
+- **Plattform**: Ren `index.html` med innebygd JavaScript og CSS. Ingen bundler/rammeverk.
+- **Hosting**: GitHub Pages (`https://havet.app`), bygges direkte fra `main`‑branch, rotmappe.
+- **Datakilde**: Offentlig Google Docs‑dokument (ikke regneark), eksporteres som HTML og parses i nettleseren.
+- **Mål**: Vise _én_ verdi per uke for **Havet Arena** (E. coli cfu/100 ml) + en enkel historikkgraf, uten backend.
 
 ### 1. Datakilde
 
