@@ -413,7 +413,7 @@
             const doc = parser.parseFromString(html, 'text/html');
             const allTables = Array.from(doc.querySelectorAll('table'));
             
-            log('Antall tabeller funnet:', allTables.length);
+            log('Antall tabeller funnet (etter 2024-cutoff):', allTables.length);
             
             if (allTables.length === 0) {
                 log('Ingen <table> elementer funnet, søker etter alternativ struktur...');
@@ -421,78 +421,33 @@
                 log('Dokument tekst (første 1000 tegn):', allText.substring(0, 1000));
                 throw new Error('Ingen tabeller funnet i dokumentet. Dokumentet kan ha en annen struktur.');
             }
-
-            const currentYearNum = new Date().getFullYear();
-
-            // Finn år per tabell ut fra all tekst i tabellen.
-            // Regnearket har én side per år (f.eks. 2025 på side 1, 2024 på side 2),
-            // så tabeller for 2024 vil ha "2024" i teksten, mens 2025-tabeller har "2025".
-            const tableInfos = allTables.map((table, idx) => {
-                let year = null;
-                const text = (table.textContent || '').toLowerCase();
-                if (text.includes('2025')) {
-                    year = 2025;
-                } else if (text.includes('2024')) {
-                    year = 2024;
-                } else {
-                    const m = text.match(/(20\d{2})/);
-                    if (m) {
-                        year = parseInt(m[1], 10);
-                    }
-                }
-                log(`Tabell ${idx + 1}: detektert år=${year}`);
-                return { table, year };
-            });
-
-            const years = tableInfos.map(t => t.year).filter(y => !!y);
-            let targetYear = currentYearNum;
-            if (!years.includes(currentYearNum) && years.length > 0) {
-                targetYear = Math.max(...years);
-            }
-
-            log(`Målår for data: ${targetYear}`);
-
-            // Velg bare tabeller som matcher målåret (eller som ikke har eksplisitt år)
-            let tablesToUse = tableInfos
-                .filter(t => t.year === null || t.year === targetYear)
-                .map(t => t.table);
-
-            // Hvis ingen tabeller matcher målåret, fall tilbake til alle
-            if (tablesToUse.length === 0) {
-                log('Ingen tabeller med eksplisitt målår funnet, bruker alle tabeller');
-                tablesToUse = allTables;
-            }
-
-            log(`Bruker ${tablesToUse.length} tabell(er) for CSV-kombinasjon`);
             
             const csvLines = [];
             let combinedHeader = null;
             const dataRows = [];
-            const targetYearStr = String(targetYear);
             
-            tablesToUse.forEach((table, tableIndex) => {
-                const rows = table.querySelectorAll('tr');
-                log(`Tabell (filtrert) ${tableIndex + 1}: ${rows.length} rader`);
+            // For hver tabell:
+            // - Finn raden der første celle inneholder "Prøvepunkt" => header-rad
+            // - Bruk raden "Havet Arena" som eneste datarad
+            allTables.forEach((table, tableIndex) => {
+                const rows = Array.from(table.querySelectorAll('tr'));
+                log(`Tabell ${tableIndex + 1}: ${rows.length} rader`);
                 
-                let headerRowIndex = 0;
-                if (rows.length > 0) {
-                    const firstRowCells = rows[0].querySelectorAll('td, th');
-                    if (firstRowCells.length > 0) {
-                        const firstCellText = firstRowCells[0].textContent.toLowerCase().trim();
-                        // Hvis første rad er tittel med "resultater for <år>", hopp over den
-                        if (firstCellText.includes('resultater') || firstCellText.includes(targetYearStr)) {
-                            headerRowIndex = 1;
-                            log(`Tabell (filtrert) ${tableIndex + 1}: Første rad er tittel, bruker rad ${headerRowIndex} som header`);
-                        }
+                let headerRowIndex = -1;
+                rows.forEach((row, rowIndex) => {
+                    const firstCell = row.querySelector('td, th');
+                    const text = firstCell ? (firstCell.textContent || '').toLowerCase().trim() : '';
+                    if (text.includes('prøvepunkt')) {
+                        headerRowIndex = rowIndex;
                     }
-                }
+                });
 
-                let stopAtOlderYear = false;
+                if (headerRowIndex === -1) {
+                    log(`Tabell ${tableIndex + 1}: Fant ingen rad med "Prøvepunkt" – hopper over tabellen`);
+                    return;
+                }
                 
                 rows.forEach((row, rowIndex) => {
-                    if (stopAtOlderYear) return;
-                    if (rowIndex === 0 && headerRowIndex === 1) return;
-                    
                     const cells = row.querySelectorAll('td, th');
                     const values = Array.from(cells).map(cell => {
                         let val = cell.textContent.trim();
@@ -501,42 +456,28 @@
                         }
                         return val;
                     });
-
-                    // Hvis vi treffer en ny seksjon som "Resultater for 2024" eller lavere år,
-                    // stopper vi å lese flere rader fra denne tabellen.
-                    const firstCellLower = (values[0] || '').toLowerCase();
-                    const yearMatch = firstCellLower.match(/resultater\s+for\s+(20\d{2})/);
-                    if (yearMatch) {
-                        const rowYear = parseInt(yearMatch[1], 10);
-                        if (rowYear < targetYear) {
-                            log(`Stoppet lesing av tabell ${tableIndex + 1} ved rad ${rowIndex} pga eldre år (${rowYear})`);
-                            stopAtOlderYear = true;
-                            return;
-                        }
-                    }
                     
-                    if (values.length > 0) {
+                    if (values.length === 0) return;
+
                         if (rowIndex === headerRowIndex) {
+                        // Header-rad
                             if (combinedHeader === null) {
                                 combinedHeader = [...values];
-                                log(`Header fra (filtrert) tabell ${tableIndex + 1}:`, values.slice(0, 5));
+                                log(`Header fra tabell ${tableIndex + 1}:`, values.slice(0, 5));
                             } else {
                                 const weekColumns = values.slice(1);
                                 combinedHeader.push(...weekColumns);
                             }
                         } else {
+                        // Data-rad
                             const rowName = values[0].toLowerCase().trim();
+                        if (!rowName) return;
+                        if (rowName.includes('havet') && rowName.includes('arena')) {
                             const rowData = values.slice(1);
-                            
-                            let dataRowIndex = -1;
-                            if (rowName.includes('havet arena')) dataRowIndex = 0;
-                            else if (rowName.includes('strandveikaia')) dataRowIndex = 1;
-                            
-                            if (dataRowIndex >= 0) {
-                                if (!dataRows[dataRowIndex]) dataRows[dataRowIndex] = [values[0]];
-                                dataRows[dataRowIndex].push(...rowData);
-                            }
+                            if (!dataRows[0]) dataRows[0] = [values[0]];
+                            dataRows[0].push(...rowData);
                         }
+                        // Rader for Strandveikaia ignoreres eksplisitt
                     }
                 });
             });
