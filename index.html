@@ -234,6 +234,7 @@
         const DOC_ID = '1RjJTWQTPRwHtWC-fi1QnelKcpBXXB3eLw7Ld-beK2TE';
         const IS_DOCUMENT = true; // Sett til false hvis det er et Sheet
         const DEBUG = false; // Endre til true for feilsøking
+        let CURRENT_REQUEST_ID = 0; // Brukes til å unngå race condition ved flere samtidige kall
         const THRESHOLD_ECOLI = 1000; // Konfigurerbar grense for advarsel
 
         // Hjelpefunksjon for fetch med timeout, slik at proxy-feil ikke henger
@@ -736,11 +737,23 @@
                 console.log(`Alle uker sortert:`, weekColumns.map(w => w.week).sort((a, b) => a - b).join(', '));
             }
             
-            // Sjekk også om currentWeek faktisk er 50
+            // Sjekk også hvilken uke vi faktisk er i
             console.log(`Current week er: ${currentWeek}`);
             
             // Finn beste match: eksakt match først, deretter nærmeste
             let bestMatch = null;
+
+            // Spesialhåndtering for årsskifte:
+            // Hvis vi er i uke 1 og datasettet ikke har uke 1, men har høye uker (52/53),
+            // antar vi at siste uke i datasettet er "forrige uke".
+            if (currentWeek === 1) {
+                const hasWeek1 = weekColumns.some(w => w.week === 1);
+                if (!hasWeek1 && weekColumns.length > 0) {
+                    const lastWeek = weekColumns.reduce((prev, curr) => curr.week > prev.week ? curr : prev);
+                    bestMatch = lastWeek;
+                    console.log(`Spesialtilfelle årsskifte: uke 1 mangler i data. Bruker siste uke i datasettet: uke ${lastWeek.week} (kolonne ${lastWeek.columnIndex}).`);
+                }
+            }
             
             // Først: Direkte søk i header-raden for å finne uke 50 (eller currentWeek)
             // Dette er en fallback hvis parsing-logikken ikke fungerer
@@ -1088,8 +1101,15 @@
         // Last inn data når siden laster
         document.addEventListener('DOMContentLoaded', async () => {
             try {
+                const myRequestId = ++CURRENT_REQUEST_ID; // Marker denne forespørselen som "siste"
                 const value = await fetchSheetData();
-                updateUI(value);
+                // Hvis det har kommet en nyere forespørsel mens vi ventet,
+                // skal ikke denne lenger oppdatere UI-et.
+                if (myRequestId === CURRENT_REQUEST_ID) {
+                    updateUI(value);
+                } else {
+                    log('Ignorerer utdatert respons fra fetchSheetData (race condition unngått).');
+                }
             } catch (error) {
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('error').style.display = 'block';
