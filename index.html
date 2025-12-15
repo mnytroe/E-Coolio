@@ -399,38 +399,72 @@
         function parseHTMLToCSV(html) {
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
-            const tables = doc.querySelectorAll('table');
+            const allTables = Array.from(doc.querySelectorAll('table'));
             
-            log('Antall tabeller funnet:', tables.length);
+            log('Antall tabeller funnet:', allTables.length);
             
-            if (tables.length === 0) {
+            if (allTables.length === 0) {
                 log('Ingen <table> elementer funnet, søker etter alternativ struktur...');
                 const allText = doc.body.textContent || doc.body.innerText || '';
                 log('Dokument tekst (første 1000 tegn):', allText.substring(0, 1000));
                 throw new Error('Ingen tabeller funnet i dokumentet. Dokumentet kan ha en annen struktur.');
             }
             
-            log(`Fant ${tables.length} tabeller - kombinerer dem`);
+            // Finn år-seksjoner "Resultater for <år>"
+            const yearSectionRegex = /resultater\s+for\s+(\d{4})/i;
+            const headings = Array.from(doc.querySelectorAll('p'));
+            const sections = [];
+            headings.forEach(p => {
+                const text = (p.textContent || '').trim();
+                const m = text.match(yearSectionRegex);
+                if (m) {
+                    const year = parseInt(m[1], 10);
+                    sections.push({ year, element: p });
+                    log(`Fant seksjon "${text}" for år ${year}`);
+                }
+            });
+
+            const currentYearNum = new Date().getFullYear();
+            let targetYear = currentYearNum;
+            let targetSection = sections.find(s => s.year === currentYearNum) || null;
+
+            if (!targetSection && sections.length > 0) {
+                // Fallback: bruk høyeste år i dokumentet
+                sections.sort((a, b) => b.year - a.year);
+                targetSection = sections[0];
+                targetYear = targetSection.year;
+                log(`Fant ingen seksjon for ${currentYearNum}, bruker siste år i dokumentet: ${targetYear}`);
+            }
+
+            let tablesToUse = [];
+            if (targetSection) {
+                // Samle alle tabeller etter denne seksjonstittelen frem til neste seksjonstittel
+                log(`Bygger CSV fra seksjon for år ${targetYear}`);
+                let node = targetSection.element.nextElementSibling;
+                while (node) {
+                    const text = (node.textContent || '').trim();
+                    if (node.tagName && node.tagName.toLowerCase() === 'p' && yearSectionRegex.test(text)) {
+                        log('Nådd neste år-seksjon, stopper innsamling av tabeller for denne årgangen');
+                        break;
+                    }
+                    if (node.tagName && node.tagName.toLowerCase() === 'table') {
+                        tablesToUse.push(node);
+                    }
+                    node = node.nextElementSibling;
+                }
+            }
+
+            if (tablesToUse.length === 0) {
+                log('Fant ingen tabeller knyttet til spesifikk år-seksjon, bruker alle tabeller');
+                tablesToUse = allTables;
+            }
+
+            log(`Bruker ${tablesToUse.length} tabell(er) for CSV-kombinasjon`);
             
             const csvLines = [];
             let combinedHeader = null;
             const dataRows = [];
             const currentYearStr = new Date().getFullYear().toString();
-
-            // I dokumentet ligger "Resultater for 2025" øverst og "Resultater for 2024" nederst.
-            // Vi vil derfor bruke KUN tabellene som ligger FØR 2024-delen.
-            const allTables = Array.from(tables);
-            let endIndex = allTables.length;
-            for (let i = 0; i < allTables.length; i++) {
-                const txt = (allTables[i].textContent || '').toLowerCase();
-                if (txt.includes('resultater for 2024') || txt.includes('2024')) {
-                    endIndex = i;
-                    log(`Stopper kombinasjon før tabell ${i + 1} (antatt 2024-seksjon)`);
-                    break;
-                }
-            }
-            const tablesToUse = allTables.slice(0, endIndex);
-            log(`Bruker ${tablesToUse.length} tabell(er) (øverst, før 2024-seksjonen)`);
             
             tablesToUse.forEach((table, tableIndex) => {
                 const rows = table.querySelectorAll('tr');
