@@ -22,7 +22,8 @@ python -m http.server 8000
 ## Deploy (GitHub Pages)
 - Legg `index.html` i repo-roten.
 - Slå på GitHub Pages i repo-innstillinger (Settings → Pages → source: main, folder: /root).
-- Åpne den publiserte URL-en.
+- Publisert produksjons-URL: https://havet.app/
+- Standard Pages-URL (fallback): https://<bruker>.github.io/<repo>/
 
 ## Tilpasning
 - Sett `DEBUG = false` i `index.html` for å slå av logging.
