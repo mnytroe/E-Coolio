@@ -193,6 +193,12 @@
             font-size: 0.9em;
         }
 
+        .history-chart {
+            margin-top: 15px;
+            display: flex;
+            justify-content: center;
+        }
+
         /* Responsivt for mobil */
         @media (max-width: 600px) {
             .container {
@@ -262,6 +268,7 @@
             <div id="valueDisplay" class="value-display" role="status" aria-live="polite" aria-label="E. coli verdi">-</div>
             <div id="statusText" class="status-text" role="alert" aria-live="assertive"></div>
             <div class="week-info" id="weekInfo"></div>
+            <div id="historyChart" class="history-chart" aria-hidden="true"></div>
         </div>
         
         <div id="error" class="error" style="display: none;"></div>
@@ -308,6 +315,7 @@
             DEBUG: false,
             CACHE_KEY: 'havet_arena_data',
             CACHE_DURATION: 1000 * 60 * 60, // 1 time
+            CACHE_VERSION: 2, // bump denne hvis datastruktur endres
             THRESHOLD_HIGH: 1000, // CFU/100ml
             RETRY_ATTEMPTS: 3,
             RETRY_DELAY: 1000
@@ -356,7 +364,7 @@
         }
         
         // === DATA-HENTING ===
-
+        
         // Hjelpefunksjon for å hente HTML fra dokumentet
         async function fetchDocumentHTML() {
             const htmlUrl = `https://docs.google.com/document/d/${CONFIG.DOC_ID}/export?format=html`;
@@ -402,11 +410,26 @@
             const csvLines = [];
             let combinedHeader = null;
             const dataRows = [];
-            const currentYear = new Date().getFullYear().toString();
+            const currentYearStr = new Date().getFullYear().toString();
+
+            // I dokumentet ligger "Resultater for 2025" øverst og "Resultater for 2024" nederst.
+            // Vi vil derfor bruke KUN tabellene som ligger FØR 2024-delen.
+            const allTables = Array.from(tables);
+            let endIndex = allTables.length;
+            for (let i = 0; i < allTables.length; i++) {
+                const txt = (allTables[i].textContent || '').toLowerCase();
+                if (txt.includes('resultater for 2024') || txt.includes('2024')) {
+                    endIndex = i;
+                    log(`Stopper kombinasjon før tabell ${i + 1} (antatt 2024-seksjon)`);
+                    break;
+                }
+            }
+            const tablesToUse = allTables.slice(0, endIndex);
+            log(`Bruker ${tablesToUse.length} tabell(er) (øverst, før 2024-seksjonen)`);
             
-            tables.forEach((table, tableIndex) => {
+            tablesToUse.forEach((table, tableIndex) => {
                 const rows = table.querySelectorAll('tr');
-                log(`Tabell ${tableIndex + 1}: ${rows.length} rader`);
+                log(`Tabell ${tableIndex + 1}: ${rows.length} rader (inkludert i kombinasjon)`);
                 
                 let headerRowIndex = 0;
                 if (rows.length > 0) {
@@ -414,7 +437,7 @@
                     if (firstRowCells.length > 0) {
                         const firstCellText = firstRowCells[0].textContent.toLowerCase().trim();
                         // Bruker dynamisk årstall i stedet for hardkodet '2025'
-                        if (firstCellText.includes('resultater') || firstCellText.includes(currentYear)) {
+                        if (firstCellText.includes('resultater') || firstCellText.includes(currentYearStr)) {
                             headerRowIndex = 1;
                             log(`Tabell ${tableIndex + 1}: Første rad er tittel, bruker rad ${headerRowIndex} som header`);
                         }
@@ -512,7 +535,7 @@
                 throw error;
             }
         }
-
+        
         // === PARSING / DATOBEHANDLING ===
         // Funksjon for å få ukenummer (ISO 8601) og år for uken (viktig rundt årsskifte)
         function getWeekNumber(date) {
@@ -534,7 +557,7 @@
             for (let i = 0; i < text.length; i++) {
                 const char = text[i];
                 const next = text[i + 1];
-
+                
                 if (char === '"') {
                     // Håndter escape av anførselstegn ("")
                     if (inQuotes && next === '"') {
@@ -817,8 +840,10 @@
             console.log('Header-rad lengde:', headerRow.length);
             console.log('Første 20 kolonner i header:', headerRow.slice(0, 20));
             
-            // Først: Samle alle uke-verdier og deres kolonne-indekser
-            const weekColumns = []; // Array av {week: number, columnIndex: number}
+            // Først: Samle alle uke-verdier og deres kolonne-indekser.
+            // Dersom samme uke finnes flere ganger (f.eks. flere år), lar vi SISTE forekomst vinne
+            // slik at nye data (senere i dokumentet) overstyrer gamle.
+            const weekColumnByWeek = {}; // weekNum -> {week, columnIndex}
             
             for (let j = 0; j < headerRow.length; j++) {
                 const headerCell = headerRow[j].toLowerCase().trim();
@@ -828,7 +853,7 @@
                 if (weekMatch) {
                     const weekNum = parseInt(weekMatch[1]);
                     foundWeeks.push(weekNum);
-                    weekColumns.push({ week: weekNum, columnIndex: j });
+                    weekColumnByWeek[weekNum] = { week: weekNum, columnIndex: j };
                     console.log(`Fant uke ${weekNum} på kolonne-indeks ${j} (cell: "${headerRow[j]}")`);
                 } else if (j < 20) {
                     // Log første 20 celler som ikke matcher for debugging
@@ -836,7 +861,8 @@
                 }
             }
             
-            console.log('Alle funnede uker:', weekColumns.map(w => `Uke ${w.week} (kol ${w.columnIndex})`).join(', '));
+            const weekColumns = Object.values(weekColumnByWeek);
+            console.log('Alle funnede uker (etter at siste forekomst per uke vinner):', weekColumns.map(w => `Uke ${w.week} (kol ${w.columnIndex})`).join(', '));
             console.log(`Søker etter uke ${currentWeek}. Funnet ${weekColumns.length} uke-kolonner totalt.`);
             
             // Vis hele header-raden for debugging
@@ -979,6 +1005,19 @@
                     rawData: lines.slice(0, 10) // Lagre første 10 rader for debugging
                 };
             }
+
+            // Bygg historikk for siste uker (bruker kun uker med gyldig tallverdi)
+            const weekValues = weekColumns
+                .slice()
+                .sort((a, b) => a.week - b.week)
+                .map(w => {
+                    const cellVal = havetArenaRow[w.columnIndex] ? havetArenaRow[w.columnIndex].trim() : '';
+                    const parsedVal = parseValue(cellVal);
+                    return parsedVal.value === null ? null : { week: w.week, value: parsedVal.value };
+                })
+                .filter(v => v !== null);
+
+            const history = weekValues.slice(-5);
             
             return {
                 value: foundValue,
@@ -986,13 +1025,14 @@
                 searchedWeek: currentWeek,
                 actualWeek: actualWeek, // Hvilken uke som faktisk ble brukt
                 isEstimate,
-                rawValue
+                rawValue,
+                history
             };
         }
 
         // === UI / VISNING ===
 
-        // Vis en enkel graf over siste uker (stub, kan utvides)
+        // Vis en enkel graf over siste uker
         function createMiniChart(weekData = []) {
             const canvas = document.createElement('canvas');
             canvas.width = 200;
@@ -1018,6 +1058,28 @@
             });
             ctx.stroke();
 
+            // Tegn punkter
+            ctx.fillStyle = '#ffffff';
+            ctx.strokeStyle = '#667eea';
+            weekData.forEach((val, idx) => {
+                const x = padX + (idx / Math.max(1, weekData.length - 1)) * (canvas.width - 2 * padX);
+                const yNorm = (val - minVal) / span;
+                const y = canvas.height - padY - yNorm * (canvas.height - 2 * padY);
+                ctx.beginPath();
+                ctx.arc(x, y, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            });
+
+            // Enkle min/max labels til venstre
+            ctx.fillStyle = '#7f8c8d';
+            ctx.font = '10px Segoe UI';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.fillText(`${Math.round(maxVal)}`, padX, 0);
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(`${Math.round(minVal)}`, padX, canvas.height);
+
             return canvas;
         }
 
@@ -1040,6 +1102,7 @@
             let actualWeek = null;
             let isEstimate = false;
             let rawValue = null;
+            let history = null;
             
             if (typeof result === 'object' && result !== null) {
                 value = result.value;
@@ -1048,6 +1111,7 @@
                 actualWeek = result.actualWeek;
                 isEstimate = result.isEstimate;
                 rawValue = result.rawValue;
+                history = result.history;
             } else {
                 value = result;
             }
@@ -1092,6 +1156,17 @@
             if (isEstimate && rawValue) {
                 weekInfo.textContent += ` — estimert verdi (${rawValue.trim()})`;
             }
+
+            // Oppdater mini-graf hvis vi har historikk
+            const historyContainer = document.getElementById('historyChart');
+            if (historyContainer) {
+                historyContainer.innerHTML = '';
+                if (history && Array.isArray(history) && history.length > 0) {
+                    log('Historikk for graf:', history);
+                    const canvas = createMiniChart(history.map(h => h.value));
+                    historyContainer.appendChild(canvas);
+                }
+            }
         }
 
         // Funksjon for å rapportere feil til ekstern tjeneste (Stub)
@@ -1124,14 +1199,23 @@
 
         // Enkel cache for å unngå unødvendige requests
         async function fetchWithCache() {
+            // Når vi debugger vil vi alltid ha ferske data
+            if (CONFIG.DEBUG) {
+                log('DEBUG er på – skipper cache og henter ferske data');
+                return await fetchSheetData();
+            }
+
             try {
                 const cachedRaw = localStorage.getItem(CONFIG.CACHE_KEY);
                 if (cachedRaw) {
-                    const { data, timestamp } = JSON.parse(cachedRaw);
-                    if (Date.now() - timestamp < CONFIG.CACHE_DURATION) {
+                    const { data, timestamp, version } = JSON.parse(cachedRaw);
+                    const isFresh = Date.now() - timestamp < CONFIG.CACHE_DURATION;
+                    const versionOk = version === CONFIG.CACHE_VERSION;
+                    if (isFresh && versionOk) {
                         log('Bruker cached data');
                         return data;
                     }
+                    log('Ignorerer cache pga utløpt tid eller versjon:', { isFresh, versionOk, version, expected: CONFIG.CACHE_VERSION });
                 }
             } catch (e) {
                 log('Klarte ikke lese cache:', e);
@@ -1142,7 +1226,8 @@
             try {
                 localStorage.setItem(CONFIG.CACHE_KEY, JSON.stringify({
                     data,
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
+                    version: CONFIG.CACHE_VERSION
                 }));
             } catch (e) {
                 log('Klarte ikke skrive cache:', e);
@@ -1160,7 +1245,7 @@
                 // Hvis det har kommet en nyere forespørsel mens vi ventet,
                 // skal ikke denne lenger oppdatere UI-et.
                 if (myRequestId === CURRENT_REQUEST_ID) {
-                    updateUI(value);
+                updateUI(value);
                 } else {
                     log('Ignorerer utdatert respons fra fetchSheetData (race condition unngått).');
                 }
