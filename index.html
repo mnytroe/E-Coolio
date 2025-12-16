@@ -364,7 +364,7 @@
             DEBUG: false,
             CACHE_KEY: 'havet_arena_data',
             CACHE_DURATION: 1000 * 60 * 60, // 1 time
-            CACHE_VERSION: 4, // bump denne hvis datastruktur endres
+            CACHE_VERSION: 5, // bump denne hvis datastruktur endres (v5: Cloudflare Worker)
             THRESHOLD_HIGH: 1000, // CFU/100ml
             RETRY_ATTEMPTS: 3,
             RETRY_DELAY: 1000
@@ -612,6 +612,120 @@
             }
         }
         
+        // === BAKTERIE-DATA HENTING (via Cloudflare Worker) ===
+        
+        // Hent bakteriedata fra Cloudflare Worker
+        async function fetchFromBakterierWorker() {
+            const workerUrl = 'https://bakterier.nytroe.workers.dev/';
+            log('Henter bakteriedata fra Cloudflare Worker:', workerUrl);
+            
+            const response = await fetchWithRetry(() => fetchWithTimeout(workerUrl, {
+                method: 'GET',
+                mode: 'cors',
+                headers: { 'Accept': 'application/json' }
+            }));
+            
+            if (!response.ok) {
+                throw new Error(`Worker HTTP ${response.status}: Kunne ikke hente bakteriedata`);
+            }
+            
+            const data = await response.json();
+            log('Bakteriedata mottatt fra worker:', data);
+            
+            if (!data.weeks || Object.keys(data.weeks).length === 0) {
+                throw new Error('Ingen ukedata funnet i worker-respons');
+            }
+            
+            return data;
+        }
+        
+        // Prosesser worker-data til formatet som resten av appen forventer
+        function processWorkerData(workerData) {
+            const currentDate = new Date();
+            const { week: currentWeek } = getWeekNumber(currentDate);
+            
+            log('Prosesserer worker-data for uke:', currentWeek);
+            
+            // Konverter weeks-objektet til et array med week-nummeret som tall
+            const availableWeeks = Object.keys(workerData.weeks)
+                .map(w => parseInt(w, 10))
+                .filter(w => {
+                    const weekData = workerData.weeks[w];
+                    return weekData && weekData.value && weekData.value.number !== null;
+                })
+                .sort((a, b) => a - b);
+            
+            log('Tilgjengelige uker med verdier:', availableWeeks);
+            
+            // Finn beste match for nåværende uke
+            let actualWeek = currentWeek;
+            let matchType = 'exact';
+            
+            if (!availableWeeks.includes(currentWeek)) {
+                // Prøv forrige uke først
+                if (availableWeeks.includes(currentWeek - 1)) {
+                    actualWeek = currentWeek - 1;
+                    matchType = 'past';
+                } else {
+                    // Finn nærmeste uke
+                    const pastWeeks = availableWeeks.filter(w => w < currentWeek).sort((a, b) => b - a);
+                    if (pastWeeks.length > 0) {
+                        actualWeek = pastWeeks[0];
+                        matchType = 'past';
+                    } else {
+                        // Ingen tidligere uker, prøv fremtidige
+                        const futureWeeks = availableWeeks.filter(w => w > currentWeek).sort((a, b) => a - b);
+                        if (futureWeeks.length > 0) {
+                            actualWeek = futureWeeks[0];
+                            matchType = 'future';
+                        }
+                    }
+                }
+                
+                if (matchType !== 'exact') {
+                    console.warn(`⚠️ ADVARSEL: Fant ikke data for uke ${currentWeek}. Bruker uke ${actualWeek} i stedet.`);
+                }
+            }
+            
+            const weekData = workerData.weeks[actualWeek];
+            if (!weekData || weekData.value.number === null) {
+                return {
+                    value: null,
+                    error: `Ingen verdi funnet for uke ${actualWeek}`,
+                    availableWeeks,
+                    searchedWeek: currentWeek
+                };
+            }
+            
+            const foundValue = weekData.value.number;
+            const isEstimate = weekData.value.isEstimate;
+            const rawValue = weekData.raw;
+            
+            // Bygg historikk for siste 5 uker med verdier
+            const history = availableWeeks
+                .filter(w => w <= actualWeek)
+                .slice(-5)
+                .map(w => ({
+                    week: w,
+                    value: workerData.weeks[w].value.number
+                }))
+                .filter(h => h.value !== null);
+            
+            log(`✅ Bruker uke ${actualWeek} (søkte etter ${currentWeek}) - verdi: ${foundValue} - matchType: ${matchType}`);
+            
+            return {
+                value: foundValue,
+                availableWeeks,
+                searchedWeek: currentWeek,
+                actualWeek,
+                isEstimate,
+                rawValue,
+                history
+            };
+        }
+        
+        // === LEGACY: Google Docs HTML-parsing (fallback) ===
+        
         // Hjelpefunksjon for å hente HTML fra dokumentet
         async function fetchDocumentHTML() {
             const htmlUrl = `https://docs.google.com/document/d/${CONFIG.DOC_ID}/export?format=html`;
@@ -619,7 +733,7 @@
             try {
                 const response = await fetchWithRetry(() => fetchWithTimeout(htmlUrl, {
                     method: 'GET',
-                    mode: 'cors', // Prøv med 'cors' først
+                    mode: 'cors',
                     headers: {
                         'Accept': 'text/html'
                     }
@@ -628,8 +742,6 @@
                 return await response.text();
             } catch (error) {
                 log('Direkte fetch feilet, prøver via proxy...', error);
-                // Fallback: Prøv via en CORS-proxy hvis direkte kall feiler
-                // Merk: Dette er en offentlig proxy, bruk med varsomhet i produksjon
                 const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(htmlUrl)}`;
                 const proxyResponse = await fetchWithRetry(() => fetchWithTimeout(proxyUrl, {}, 10000));
                 if (!proxyResponse.ok) throw new Error(`Proxy HTTP ${proxyResponse.status}: Kunne ikke hente dokument via proxy`);
@@ -839,12 +951,21 @@
             return lines;
         }
 
-        // Funksjon for å hente data fra Google Sheets eller Documents
+        // Funksjon for å hente bakteriedata (primært fra Cloudflare Worker)
         async function fetchSheetData() {
             try {
-                // Hvis det er et Document, bruk Document-metoden
+                // Primær kilde: Cloudflare Worker (raskest og skjuler datakilden)
+                log('Henter data fra Cloudflare Worker...');
+                try {
+                    const workerData = await fetchFromBakterierWorker();
+                    return processWorkerData(workerData);
+                } catch (workerError) {
+                    console.error('Worker feilet, prøver Google Document fallback...', workerError);
+                }
+                
+                // Fallback: Google Document HTML-parsing (legacy)
                 if (CONFIG.IS_DOCUMENT) {
-                    log('Henter data fra Google Document...');
+                    log('Henter data fra Google Document (fallback)...');
                     try {
                         const csvText = await fetchDocumentData();
                         const lines = parseCSV(csvText);
