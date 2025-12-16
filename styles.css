@@ -1,0 +1,278 @@
+/* Havet Arena - Badevilkår */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.container {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    text-align: center;
+    max-width: 600px;
+    width: 100%;
+}
+
+h1 {
+    color: #2c3e50;
+    margin-bottom: 10px;
+    font-size: 2.5em;
+}
+
+.subtitle {
+    color: #7f8c8d;
+    margin-bottom: 30px;
+    font-size: 1.1em;
+}
+
+.value-display {
+    font-size: 4em;
+    font-weight: bold;
+    padding: 30px;
+    border-radius: 15px;
+    margin: 30px 0;
+    transition: all 0.3s ease;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.value-display.green {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    color: white;
+}
+
+.value-display.red {
+    background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+    color: white;
+}
+
+.status-text {
+    font-size: 1.3em;
+    margin-top: 20px;
+    font-weight: 600;
+}
+
+.status-text.green {
+    color: #27ae60;
+}
+
+.status-text.red {
+    color: #e74c3c;
+}
+
+.week-info {
+    color: #7f8c8d;
+    margin-top: 20px;
+    font-size: 0.9em;
+}
+
+.temperature-container {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    margin: 15px 0;
+    flex-wrap: wrap;
+}
+
+.temperature-display {
+    color: #2c3e50;
+    font-size: 1.2em;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.temp-icon {
+    font-size: 1.3em;
+}
+
+#tempValue, #seaTempValue {
+    font-weight: 600;
+}
+
+.loading {
+    color: #7f8c8d;
+    font-size: 1.2em;
+    position: relative;
+}
+
+.loading::after {
+    content: '...';
+    animation: dots 1.5s steps(4, end) infinite;
+}
+
+@keyframes dots {
+    0%, 20% { content: '.'; }
+    40% { content: '..'; }
+    60%, 100% { content: '...'; }
+}
+
+.error {
+    color: #e74c3c;
+    background: #ffe6e6;
+    padding: 15px;
+    border-radius: 10px;
+    margin-top: 20px;
+    line-height: 1.6;
+    text-align: left;
+    white-space: pre-wrap;
+}
+
+.error a {
+    color: #667eea;
+    text-decoration: underline;
+}
+
+.sauna-icon {
+    font-size: 3em;
+    margin-bottom: 20px;
+}
+
+.info-section {
+    margin-top: 30px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    text-align: left;
+    font-size: 0.9em;
+    color: #2c3e50;
+}
+
+.info-section h3 {
+    color: #2c3e50;
+    margin-bottom: 15px;
+    font-size: 1.1em;
+    text-align: center;
+}
+
+.info-section ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+.info-section li {
+    margin: 10px 0;
+    padding-left: 25px;
+    position: relative;
+}
+
+.info-section li:before {
+    content: "•";
+    position: absolute;
+    left: 10px;
+    color: #667eea;
+    font-weight: bold;
+}
+
+.info-section a {
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.info-section a:hover {
+    text-decoration: underline;
+}
+
+.warning-box {
+    background: #fff3cd;
+    border-left: 4px solid #ffc107;
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 5px;
+    font-size: 0.9em;
+}
+
+.sampling-info {
+    background: #e7f3ff;
+    border-left: 4px solid #2196F3;
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 5px;
+    font-size: 0.9em;
+}
+
+.history-chart {
+    margin-top: 15px;
+    display: flex;
+    justify-content: center;
+}
+
+/* Responsivt for mobil */
+@media (max-width: 600px) {
+    .container {
+        padding: 20px;
+        margin: 10px;
+    }
+    
+    h1 {
+        font-size: 1.8em;
+    }
+    
+    .value-display {
+        font-size: 3em;
+        padding: 20px;
+    }
+    
+    .info-section {
+        font-size: 0.85em;
+    }
+}
+
+/* Mørk modus */
+@media (prefers-color-scheme: dark) {
+    body {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    }
+    
+    .container {
+        background: rgba(30, 30, 46, 0.95);
+        color: #e0e0e0;
+    }
+    
+    h1, .info-section h3 {
+        color: #e0e0e0;
+    }
+
+    .temperature-display {
+        color: #e0e0e0;
+    }
+
+    .temperature-container {
+        gap: 20px;
+    }
+
+    .info-section {
+        background: #202133;
+        color: #e0e0e0;
+    }
+
+    .warning-box {
+        background: #4a3b1a;
+        border-left-color: #ffc107;
+    }
+
+    .sampling-info {
+        background: #1b2a3d;
+        border-left-color: #64b5f6;
+    }
+
+    .info-section a {
+        color: #9fa8ff;
+    }
+}
+
