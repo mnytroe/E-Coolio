@@ -1399,50 +1399,54 @@
         // Vis en enkel graf over siste uker
         function createMiniChart(weekData = []) {
             const canvas = document.createElement('canvas');
-            canvas.width = 200;
-            canvas.height = 100;
+            canvas.width = 280;
+            canvas.height = 120;
             const ctx = canvas.getContext('2d');
             if (!ctx || weekData.length === 0) return canvas;
 
             const maxVal = Math.max(...weekData);
             const minVal = Math.min(...weekData);
-            const padX = 10;
-            const padY = 10;
+            const padX = 25;
+            const padY = 20;
+            const padTop = 25; // Ekstra plass til labels over punktene
             const span = Math.max(1, maxVal - minVal);
 
+            // Beregn punktposisjoner
+            const points = weekData.map((val, idx) => {
+                const x = padX + (idx / Math.max(1, weekData.length - 1)) * (canvas.width - 2 * padX);
+                const yNorm = (val - minVal) / span;
+                const y = canvas.height - padY - yNorm * (canvas.height - padY - padTop);
+                return { x, y, val };
+            });
+
+            // Tegn linjen
             ctx.strokeStyle = '#667eea';
             ctx.lineWidth = 2;
             ctx.beginPath();
-            weekData.forEach((val, idx) => {
-                const x = padX + (idx / Math.max(1, weekData.length - 1)) * (canvas.width - 2 * padX);
-                const yNorm = (val - minVal) / span;
-                const y = canvas.height - padY - yNorm * (canvas.height - 2 * padY);
-                if (idx === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
+            points.forEach((pt, idx) => {
+                if (idx === 0) ctx.moveTo(pt.x, pt.y);
+                else ctx.lineTo(pt.x, pt.y);
             });
             ctx.stroke();
 
             // Tegn punkter
             ctx.fillStyle = '#ffffff';
             ctx.strokeStyle = '#667eea';
-            weekData.forEach((val, idx) => {
-                const x = padX + (idx / Math.max(1, weekData.length - 1)) * (canvas.width - 2 * padX);
-                const yNorm = (val - minVal) / span;
-                const y = canvas.height - padY - yNorm * (canvas.height - 2 * padY);
+            points.forEach(pt => {
                 ctx.beginPath();
-                ctx.arc(x, y, 3, 0, Math.PI * 2);
+                ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.stroke();
             });
 
-            // Enkle min/max labels til venstre
-            ctx.fillStyle = '#7f8c8d';
-            ctx.font = '10px Segoe UI';
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'top';
-            ctx.fillText(`${Math.round(maxVal)}`, padX, 0);
+            // Tegn verdier over hvert punkt
+            ctx.fillStyle = '#2c3e50';
+            ctx.font = 'bold 10px Segoe UI';
+            ctx.textAlign = 'center';
             ctx.textBaseline = 'bottom';
-            ctx.fillText(`${Math.round(minVal)}`, padX, canvas.height);
+            points.forEach(pt => {
+                ctx.fillText(`${Math.round(pt.val)}`, pt.x, pt.y - 8);
+            });
 
             return canvas;
         }
