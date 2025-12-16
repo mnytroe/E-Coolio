@@ -451,172 +451,137 @@
             }
         }
 
+        // Hjelpefunksjon: Prøver å finne temperatur i komplekse JSON-objekter fra Havvarsel
+        function parseHavvarselJson(data) {
+            if (!data) return null;
+
+            // 1. Sjekk variables-strukturen (vanlig i Havvarsel API v2)
+            if (data.variables && Array.isArray(data.variables) && data.variables.length > 0) {
+                const variable = data.variables[0];
+                // Sjekk data-array inni variabelen
+                if (variable.data && Array.isArray(variable.data) && variable.data.length > 0) {
+                    return variable.data[0]?.value;
+                }
+                // Sjekk direkte verdier på variabelen
+                if (variable.value !== undefined) return variable.value;
+            }
+
+            // 2. Sjekk queryPoint / gridPoint strukturer
+            const pointData = data.queryPoint || data.closestGridPoint || data.closestGridPointWithData;
+            if (pointData) {
+                if (pointData.temperature !== undefined) return pointData.temperature;
+                if (Array.isArray(pointData.values) && pointData.values.length > 0) {
+                    return pointData.values[0];
+                }
+            }
+
+            // 3. Sjekk flate/enkle strukturer (fallback)
+            const flatCandidates = [
+                data.temperature, data.temp, data.value,
+                data.current?.temperature, data.current?.temp,
+                (data.data && (data.data.temperature || data.data.temp || data.data.value)),
+                (Array.isArray(data) && data[0]?.temperature)
+            ];
+
+            return flatCandidates.find(val => val !== undefined && val !== null) ?? null;
+        }
+
+        const LAT = 63.44181;
+        const LON = 10.42506;
+
+        // Kilde 1: Cloudflare Worker (Hovedkilde)
+        async function fetchFromWorker() {
+            const url = `https://bading.nytroe.workers.dev/?lat=${LAT}&lon=${LON}`;
+            const res = await fetchWithRetry(() => fetchWithTimeout(url, { headers: { 'Accept': 'application/json' } }));
+            if (!res.ok) throw new Error(`Worker status: ${res.status}`);
+            
+            const data = await res.json();
+            const temp = data?.now?.sea_water_temperature;
+            
+            if (temp === undefined || temp === null) throw new Error('Ingen temperatur i worker-data');
+            return temp;
+        }
+
+        // Kilde 2: Havvarsel API (Direkte)
+        async function fetchFromHavvarselDirect() {
+            const url = `https://api.havvarsel.no/apis/duapi/havvarsel/v2/temperatureprojection/${LON}/${LAT}`;
+            const res = await fetchWithRetry(() => fetchWithTimeout(url, { headers: { 'Accept': 'application/json' } }));
+            if (!res.ok) throw new Error(`API status: ${res.status}`);
+            
+            const data = await res.json();
+            const temp = parseHavvarselJson(data);
+            
+            if (temp === undefined || temp === null) throw new Error('Fant ikke temperatur i API-data');
+            return temp;
+        }
+
+        // Kilde 3: Havvarsel API (Via Proxy)
+        async function fetchFromHavvarselProxy() {
+            const targetUrl = `https://api.havvarsel.no/apis/duapi/havvarsel/v2/temperatureprojection/${LON}/${LAT}`;
+            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+            
+            const res = await fetchWithRetry(() => fetchWithTimeout(proxyUrl, {}, 10000));
+            if (!res.ok) throw new Error(`Proxy status: ${res.status}`);
+            
+            const data = await res.json();
+            const temp = parseHavvarselJson(data); // Gjenbruk parseren!
+            
+            if (temp === undefined || temp === null) throw new Error('Fant ikke temperatur i proxy-data');
+            return temp;
+        }
+
+        // Kilde 4: HTML Scraping (Siste utvei)
+        async function fetchFromHtmlScraping() {
+            const pageUrl = `https://havvarsel.no/oversikt/${LAT}/${LON}`;
+            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(pageUrl)}`;
+            
+            const res = await fetchWithRetry(() => fetchWithTimeout(proxyUrl, {}, 15000));
+            if (!res.ok) throw new Error(`HTML Proxy status: ${res.status}`);
+            
+            const html = await res.text();
+            
+            // Regex som håndterer både punktum og komma, og litt mer robust matching
+            // Ser etter tall fulgt av "°C" i nærheten av ordet "badetemperatur" e.l.
+            const regex = /(?:badetemperatur|vann?temp|sea.*temp)[^>]*>[\s\S]{0,100}?(\d+[.,]\d+)\s*°?C/i;
+            const match = html.match(regex);
+            
+            if (match && match[1]) {
+                return parseFloat(match[1].replace(',', '.')); // Fiks komma til punktum her
+            }
+            throw new Error('Kunne ikke scrape temperatur fra HTML');
+        }
+
         // Hent badetemperatur fra Cloudflare Worker (MET OceanForecast 2.0) eller Havvarsel API
         async function getSeaTemperatureAtHavetArena() {
-            const lat = 63.44181;
-            const lon = 10.42506;
-            
-            // Prøv Cloudflare Worker først (MET OceanForecast 2.0 - offisiell kilde)
-            log('Henter badetemperatur fra Cloudflare Worker (MET OceanForecast)...');
-            try {
-                const workerUrl = `https://bading.nytroe.workers.dev/?lat=${lat}&lon=${lon}`;
-                const workerResponse = await fetchWithRetry(() => fetchWithTimeout(workerUrl, {
-                    method: 'GET',
-                    mode: 'cors',
-                    headers: {
-                        'Accept': 'application/json'
-                    }
-                }));
-                
-                if (workerResponse.ok) {
-                    const data = await workerResponse.json();
-                    log('Cloudflare Worker data mottatt:', data);
-                    
-                    // Worker-en returnerer: { updated_at: "...", now: { sea_water_temperature: 5.9, ... } }
-                    const temp = data?.now?.sea_water_temperature;
-                    
-                    if (temp !== null && temp !== undefined && !isNaN(temp)) {
-                        log('Fant badetemperatur fra Cloudflare Worker:', temp);
-                        return temp;
-                    }
-                    
-                    log('Kunne ikke finne sea_water_temperature i worker-respons. Struktur:', JSON.stringify(data));
-                } else {
-                    log('Cloudflare Worker respons ikke OK:', workerResponse.status, workerResponse.statusText);
-                }
-            } catch (workerError) {
-                log('Cloudflare Worker feilet, prøver Havvarsel API...', workerError);
-            }
-            
-            // Fallback: Prøv Havvarsel API
-            const apiUrl = `https://api.havvarsel.no/apis/duapi/havvarsel/v2/temperatureprojection/${lon}/${lat}`;
-            log('Henter badetemperatur fra Havvarsel API:', apiUrl);
-            
-            try {
-                const res = await fetchWithRetry(() => fetchWithTimeout(apiUrl, {
-                    method: 'GET',
-                    mode: 'cors',
-                    headers: {
-                        'Accept': 'application/json'
-                    }
-                }));
-                
-                if (!res.ok) {
-                    log('Havvarsel API respons ikke OK:', res.status, res.statusText);
-                    throw new Error(`Havvarsel API forespørsel feilet: ${res.status}`);
-                }
+            // Prioritert liste over kilder
+            const sources = [
+                { name: 'Cloudflare Worker', fn: fetchFromWorker },
+                { name: 'Havvarsel API',     fn: fetchFromHavvarselDirect },
+                { name: 'Havvarsel Proxy',   fn: fetchFromHavvarselProxy },
+                { name: 'Web Scraping',      fn: fetchFromHtmlScraping }
+            ];
 
-                const data = await res.json();
-                log('Havvarsel API data mottatt:', data);
+            log('Starter henting av badetemperatur...');
 
-                // Prøv forskjellige mulige strukturer
-                const temp = data?.temperature || data?.temp || data?.value || 
-                            (data?.data && (data.data.temperature || data.data.temp || data.data.value)) ||
-                            (Array.isArray(data) && data[0]?.temperature) ||
-                            null;
-
-                if (temp !== null) {
-                    return temp;
-                }
-                
-                log('Kunne ikke finne temperatur i API-respons. Struktur:', JSON.stringify(data));
-            } catch (error) {
-                log('Direkte API-fetch feilet, prøver via proxy...', error);
-                // Fallback: Prøv via en CORS-proxy hvis direkte kall feiler
-                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`;
+            for (const source of sources) {
                 try {
-                    const proxyResponse = await fetchWithRetry(() => fetchWithTimeout(proxyUrl, {}, 10000));
-                    if (proxyResponse.ok) {
-                const data = await proxyResponse.json();
-                log('Havvarsel API data mottatt via proxy:', data);
-                log('Fullstendig API-struktur:', JSON.stringify(data, null, 2));
-
-                // Prøv forskjellige mulige strukturer basert på det vi ser i loggen
-                let temp = null;
-                
-                // Sjekk om det er en variables-array (som vi ser i loggen)
-                if (data?.variables && Array.isArray(data.variables) && data.variables.length > 0) {
-                    const variable = data.variables[0];
-                    // variable.data er en array med objekter som har {value, rawTime}
-                    if (variable?.data && Array.isArray(variable.data) && variable.data.length > 0) {
-                        // Ta den første (nåværende) temperaturen
-                        temp = variable.data[0]?.value;
-                        log('Fant temperatur i variables[0].data[0].value:', temp);
+                    log(`Prøver kilde: ${source.name}...`);
+                    const temp = await source.fn();
+                    
+                    // Valider at vi faktisk fikk et tall (ikke NaN)
+                    if (typeof temp === 'number' && !isNaN(temp)) {
+                        log(`✅ Suksess med ${source.name}: ${temp}°C`);
+                        return temp;
                     } else {
-                        // Fallback til direkte felter hvis data-array ikke finnes
-                        temp = variable?.value || variable?.temperature || variable?.temp;
-                        log('Fant temperatur i variables[0] (fallback):', temp);
+                        log(`⚠️ ${source.name} returnerte ugyldig data:`, temp);
                     }
+                } catch (error) {
+                    // Vi logger bare feilen og går videre til neste kilde i loopen
+                    log(`❌ ${source.name} feilet:`, error.message);
                 }
-                
-                // Prøv også direkte felter
-                if (temp === null || temp === undefined) {
-                    temp = data?.temperature || data?.temp || data?.value || 
-                           data?.current?.temperature || data?.current?.temp ||
-                           (data?.data && (data.data.temperature || data.data.temp || data.data.value)) ||
-                           (Array.isArray(data) && data[0]?.temperature) ||
-                           null;
-                }
-                
-                // Sjekk queryPoint eller closestGridPoint
-                if (temp === null || temp === undefined) {
-                    if (data?.queryPoint?.temperature) temp = data.queryPoint.temperature;
-                    if (data?.closestGridPoint?.temperature) temp = data.closestGridPoint.temperature;
-                    if (data?.closestGridPointWithData?.temperature) temp = data.closestGridPointWithData.temperature;
-                    // Sjekk om det er verdier i queryPoint
-                    if (data?.queryPoint?.values && Array.isArray(data.queryPoint.values) && data.queryPoint.values.length > 0) {
-                        temp = data.queryPoint.values[0];
-                    }
-                }
+            }
 
-                if (temp !== null && temp !== undefined) {
-                    log('Fant temperatur:', temp);
-                    return temp;
-                } else {
-                    log('Kunne ikke finne temperatur i API-respons. Struktur:', JSON.stringify(data, null, 2));
-                }
-                    }
-                } catch (proxyError) {
-                    log('Proxy feilet også:', proxyError);
-                }
-            }
-            
-            // Fallback: Prøv å hente fra nettsiden direkte
-            log('Prøver å hente fra havvarsel.no nettside...');
-            try {
-                const pageUrl = `https://havvarsel.no/oversikt/${lat}/${lon}`;
-                const proxyPageUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(pageUrl)}`;
-                const pageResponse = await fetchWithRetry(() => fetchWithTimeout(proxyPageUrl, {}, 15000));
-                
-                if (pageResponse.ok) {
-                    const html = await pageResponse.text();
-                    log('Havvarsel.no HTML mottatt, lengde:', html.length);
-                    
-                    // Prøv å finne temperatur i HTML (søk etter tall etter "badetemperatur" eller lignende)
-                    const tempMatch = html.match(/(?:badetemperatur|vann?temp|sea.*temp)[^>]*>[\s\S]*?(\d+(?:[.,]\d+)?)\s*°?C/i) ||
-                                    html.match(/(\d+(?:[.,]\d+)?)\s*°?C[^<]*badetemperatur/i) ||
-                                    html.match(/badetemperatur[^>]*>[\s\S]{0,200}?(\d+(?:[.,]\d+)?)/i);
-                    
-                    if (tempMatch && tempMatch[1]) {
-                        const temp = parseFloat(tempMatch[1].replace(',', '.'));
-                        if (!isNaN(temp)) {
-                            log('Fant badetemperatur i HTML:', temp);
-                            return temp;
-                        }
-                    }
-                    
-                    log('Kunne ikke finne badetemperatur i HTML');
-                }
-            } catch (pageError) {
-                log('Kunne ikke hente fra nettside:', pageError);
-            }
-            
-            // Merk: Trondheim Havn (trondheimhavn.no/vannstrom/) bruker JavaScript for å laste data,
-            // så vi kan ikke hente temperaturen via statisk HTML-parsing. Vi får bare "Loading..." i HTML-en.
-            // Hvis de har en offentlig API i fremtiden, kan vi legge det til her.
-            
-            // Hvis alt feiler, returner null
-            log('Kunne ikke hente badetemperatur fra noen kilde');
+            log('⛔ Alle kilder feilet. Ingen badetemperatur funnet.');
             return null;
         }
 
