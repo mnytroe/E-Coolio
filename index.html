@@ -451,14 +451,46 @@
             }
         }
 
-        // Hent badetemperatur fra Havvarsel API eller nettside
+        // Hent badetemperatur fra Cloudflare Worker (MET OceanForecast 2.0) eller Havvarsel API
         async function getSeaTemperatureAtHavetArena() {
             const lat = 63.44181;
             const lon = 10.42506;
             
-            // Prøv API først
+            // Prøv Cloudflare Worker først (MET OceanForecast 2.0 - offisiell kilde)
+            log('Henter badetemperatur fra Cloudflare Worker (MET OceanForecast)...');
+            try {
+                const workerUrl = `https://bading.nytroe.workers.dev/?lat=${lat}&lon=${lon}`;
+                const workerResponse = await fetchWithRetry(() => fetchWithTimeout(workerUrl, {
+                    method: 'GET',
+                    mode: 'cors',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                }));
+                
+                if (workerResponse.ok) {
+                    const data = await workerResponse.json();
+                    log('Cloudflare Worker data mottatt:', data);
+                    
+                    // Worker-en returnerer: { updated_at: "...", now: { sea_water_temperature: 5.9, ... } }
+                    const temp = data?.now?.sea_water_temperature;
+                    
+                    if (temp !== null && temp !== undefined && !isNaN(temp)) {
+                        log('Fant badetemperatur fra Cloudflare Worker:', temp);
+                        return temp;
+                    }
+                    
+                    log('Kunne ikke finne sea_water_temperature i worker-respons. Struktur:', JSON.stringify(data));
+                } else {
+                    log('Cloudflare Worker respons ikke OK:', workerResponse.status, workerResponse.statusText);
+                }
+            } catch (workerError) {
+                log('Cloudflare Worker feilet, prøver Havvarsel API...', workerError);
+            }
+            
+            // Fallback: Prøv Havvarsel API
             const apiUrl = `https://api.havvarsel.no/apis/duapi/havvarsel/v2/temperatureprojection/${lon}/${lat}`;
-            log('Henter badetemperatur fra API:', apiUrl);
+            log('Henter badetemperatur fra Havvarsel API:', apiUrl);
             
             try {
                 const res = await fetchWithRetry(() => fetchWithTimeout(apiUrl, {
@@ -578,6 +610,10 @@
             } catch (pageError) {
                 log('Kunne ikke hente fra nettside:', pageError);
             }
+            
+            // Merk: Trondheim Havn (trondheimhavn.no/vannstrom/) bruker JavaScript for å laste data,
+            // så vi kan ikke hente temperaturen via statisk HTML-parsing. Vi får bare "Loading..." i HTML-en.
+            // Hvis de har en offentlig API i fremtiden, kan vi legge det til her.
             
             // Hvis alt feiler, returner null
             log('Kunne ikke hente badetemperatur fra noen kilde');
