@@ -638,6 +638,36 @@ body.theme-brutalist .info-section {
     margin-bottom: 15px;
     box-shadow: 6px 6px 0 #000;
     border-radius: 0;
+    color: #000;
+}
+
+body.theme-brutalist .info-section li,
+body.theme-brutalist .info-section p,
+body.theme-brutalist .info-section strong {
+    color: #000;
+}
+
+body.theme-brutalist .info-section li:before {
+    color: #000;
+}
+
+body.theme-brutalist .details-content {
+    color: #000;
+}
+
+body.theme-brutalist .sampling-info {
+    background: #e7f3ff;
+    border-left: 4px solid #2196F3;
+    border: 3px solid #000;
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 0;
+    color: #333;
+}
+
+body.theme-brutalist .sampling-info strong {
+    color: #000;
+    font-weight: 900;
 }
 
 @media (min-width: 600px) {
