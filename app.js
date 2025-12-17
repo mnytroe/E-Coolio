@@ -6,7 +6,8 @@ const CONFIG = {
     CACHE_VERSION: 6, // v6: Separate filer, kun Cloudflare Workers
     THRESHOLD_HIGH: 1000, // CFU/100ml
     RETRY_ATTEMPTS: 3,
-    RETRY_DELAY: 1000
+    RETRY_DELAY: 1000,
+    THEME_KEY: 'havet_arena_theme'
 };
 
 let CURRENT_REQUEST_ID = 0;
@@ -387,6 +388,101 @@ function createMiniChart(historyData = []) {
     return canvas;
 }
 
+// Bar chart for brutalist tema
+function createBarChart(historyData = []) {
+    if (!historyData || historyData.length === 0) return null;
+    
+    const values = historyData.map(h => h.value);
+    const weeks = historyData.map(h => h.week);
+    const maxVal = Math.max(...values);
+    
+    const container = document.createElement('div');
+    container.className = 'graph-bars';
+    
+    historyData.forEach((item) => {
+        const heightPercent = maxVal > 0 ? (item.value / maxVal) * 100 : 0;
+        const barContainer = document.createElement('div');
+        barContainer.className = 'bar-container';
+        barContainer.innerHTML = `
+            <div class="bar-value">${Math.round(item.value)}</div>
+            <div class="bar" style="height: ${heightPercent}%;"></div>
+            <div class="bar-label">Uke ${item.week}</div>
+        `;
+        container.appendChild(barContainer);
+    });
+    
+    return container;
+}
+
+// === TEMA-FUNKSJONALITET ===
+
+function getTheme() {
+    return localStorage.getItem(CONFIG.THEME_KEY) || 'modern';
+}
+
+function setTheme(theme) {
+    localStorage.setItem(CONFIG.THEME_KEY, theme);
+    document.body.className = `theme-${theme}`;
+    updateThemeToggle();
+}
+
+function updateThemeToggle() {
+    const toggle = document.getElementById('themeToggle');
+    if (toggle) {
+        const currentTheme = getTheme();
+        toggle.textContent = currentTheme === 'brutalist' ? '🎨 Modern' : '💀 Brutalist';
+    }
+}
+
+function initTheme() {
+    const theme = getTheme();
+    document.body.className = `theme-${theme}`;
+    updateThemeToggle();
+}
+
+function toggleTheme() {
+    const currentTheme = getTheme();
+    const newTheme = currentTheme === 'brutalist' ? 'modern' : 'brutalist';
+    setTheme(newTheme);
+    
+    // Re-render graf hvis den finnes
+    const historyContainer = document.getElementById('historyChart');
+    if (historyContainer && historyContainer.dataset.history) {
+        const history = JSON.parse(historyContainer.dataset.history);
+        renderChart(history);
+    }
+}
+
+// Eksponer globalt for HTML onclick
+window.toggleTheme = toggleTheme;
+
+function renderChart(history) {
+    const historyContainer = document.getElementById('historyChart');
+    if (!historyContainer) return;
+    
+    const theme = getTheme();
+    historyContainer.innerHTML = '';
+    historyContainer.dataset.history = JSON.stringify(history);
+    
+    if (history && Array.isArray(history) && history.length > 0) {
+        if (theme === 'brutalist') {
+            const barChart = createBarChart(history);
+            if (barChart) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'mini-graph';
+                const title = document.createElement('h3');
+                title.textContent = 'Siste 5 uker';
+                wrapper.appendChild(title);
+                wrapper.appendChild(barChart);
+                historyContainer.appendChild(wrapper);
+            }
+        } else {
+            const canvas = createMiniChart(history);
+            historyContainer.appendChild(canvas);
+        }
+    }
+}
+
 function updateUI(result) {
     const loading = document.getElementById('loading');
     const content = document.getElementById('content');
@@ -443,7 +539,8 @@ function updateUI(result) {
         if (statusIconPath) {
             statusIconPath.setAttribute('d', 'M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.75c1.155 2-.289 4.5-2.598 4.5H4.644c-2.309 0-3.752-2.5-2.598-4.5L9.401 3.003zM12 8.25a.75.75 0 00-.75.75v3a.75.75 0 001.5 0v-3a.75.75 0 00-.75-.75zm0 6a.75.75 0 100 1.5.75.75 0 000-1.5z');
         }
-        statusText.className = 'status-text red';
+        const theme = getTheme();
+        statusText.className = theme === 'brutalist' ? 'status-text warning' : 'status-text red';
     } else {
         valueDisplay.className = 'value-display green';
         if (statusTextLabel) statusTextLabel.textContent = 'Trygt for bading';
@@ -465,15 +562,10 @@ function updateUI(result) {
         weekInfo.textContent += ` — estimert verdi (${rawValue.trim()})`;
     }
 
-    // Oppdater mini-graf med historikk (inkluderer ukenummer)
-    const historyContainer = document.getElementById('historyChart');
-    if (historyContainer) {
-        historyContainer.innerHTML = '';
-        if (history && Array.isArray(history) && history.length > 0) {
-            log('Historikk for graf:', history);
-            const canvas = createMiniChart(history);
-            historyContainer.appendChild(canvas);
-        }
+    // Oppdater graf med historikk (bruker riktig type basert på tema)
+    if (history && Array.isArray(history) && history.length > 0) {
+        log('Historikk for graf:', history);
+        renderChart(history);
     }
 }
 
@@ -527,6 +619,9 @@ if ('serviceWorker' in navigator) {
 // === INITIALISERING ===
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // Initialiser tema
+    initTheme();
+    
     // Hent temperaturer uavhengig av bakteriedata
     updateTemperature();
     updateSeaTemperature();

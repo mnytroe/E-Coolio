@@ -391,3 +391,387 @@ h1 {
     }
 }
 
+/* === BRUTALIST TEMA === */
+
+body.theme-brutalist {
+    font-family: 'Courier New', monospace;
+    background: #e8f4f8;
+    padding: 15px;
+    line-height: 1.6;
+}
+
+body.theme-brutalist .container {
+    max-width: 800px;
+    margin: 0 auto;
+    background: #fff;
+    border: 4px solid #000;
+    padding: 20px;
+    box-shadow: 6px 6px 0 #000;
+    border-radius: 0;
+}
+
+@media (min-width: 600px) {
+    body.theme-brutalist {
+        padding: 20px;
+    }
+    
+    body.theme-brutalist .container {
+        border: 5px solid #000;
+        padding: 30px;
+        box-shadow: 8px 8px 0 #000;
+    }
+}
+
+body.theme-brutalist h1 {
+    font-size: 2em;
+    font-weight: 900;
+    text-transform: uppercase;
+    margin-bottom: 15px;
+    color: #000;
+    text-align: center;
+}
+
+@media (min-width: 600px) {
+    body.theme-brutalist h1 {
+        font-size: 3em;
+    }
+}
+
+body.theme-brutalist .temperature-container {
+    gap: 10px;
+    margin: 15px 0;
+}
+
+body.theme-brutalist .temperature-display {
+    background: #1e90ff;
+    color: #fff;
+    border: 3px solid #000;
+    padding: 8px 12px;
+    font-weight: bold;
+    font-size: 0.85em;
+    box-shadow: 3px 3px 0 #000;
+    border-radius: 0;
+}
+
+@media (min-width: 600px) {
+    body.theme-brutalist .temperature-display {
+        padding: 8px 16px;
+        font-size: 0.9em;
+        box-shadow: 4px 4px 0 #000;
+    }
+}
+
+body.theme-brutalist .subtitle {
+    font-size: 1em;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    text-align: center;
+    color: #000;
+}
+
+@media (min-width: 600px) {
+    body.theme-brutalist .subtitle {
+        font-size: 1.2em;
+    }
+}
+
+body.theme-brutalist .value-display {
+    font-size: 3.5em;
+    font-weight: 900;
+    color: #1e90ff;
+    margin: 20px 0;
+    text-align: center;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    border-radius: 0;
+}
+
+@media (min-width: 600px) {
+    body.theme-brutalist .value-display {
+        font-size: 5em;
+    }
+}
+
+body.theme-brutalist .value-display.green {
+    color: #1e90ff;
+    background: transparent;
+}
+
+body.theme-brutalist .value-display.red {
+    color: #ff6b6b;
+    background: transparent;
+}
+
+body.theme-brutalist .status-text {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 15px;
+    background: #90ee90;
+    border: 3px solid #000;
+    margin: 20px 0;
+    font-weight: bold;
+    font-size: 1em;
+    border-radius: 0;
+}
+
+@media (min-width: 600px) {
+    body.theme-brutalist .status-text {
+        gap: 15px;
+        padding: 20px;
+        border: 4px solid #000;
+        font-size: 1.2em;
+    }
+}
+
+body.theme-brutalist .status-text.warning,
+body.theme-brutalist .status-text.red {
+    background: #ff6b6b;
+    color: #fff;
+}
+
+body.theme-brutalist .status-icon {
+    font-size: 2em;
+}
+
+body.theme-brutalist .week-info {
+    margin: 20px 0;
+    padding: 15px;
+    background: #f0f0f0;
+    border: 3px solid #000;
+    font-weight: bold;
+    text-align: center;
+    border-radius: 0;
+}
+
+body.theme-brutalist .estimated {
+    color: #666;
+    font-size: 0.9em;
+    margin-top: 5px;
+}
+
+body.theme-brutalist .mini-graph {
+    margin-top: 30px;
+    padding: 20px;
+    background: #f9f9f9;
+    border: 3px solid #000;
+    border-radius: 0;
+}
+
+body.theme-brutalist .mini-graph h3 {
+    margin-bottom: 15px;
+    font-size: 1em;
+    text-transform: uppercase;
+    color: #000;
+}
+
+body.theme-brutalist .graph-bars {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    height: 200px;
+    margin-top: 15px;
+}
+
+body.theme-brutalist .bar-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    height: 100%;
+    justify-content: flex-end;
+}
+
+body.theme-brutalist .bar {
+    width: 100%;
+    background: #1e90ff;
+    border: 3px solid #000;
+    position: relative;
+    min-height: 10px;
+    border-radius: 0;
+}
+
+body.theme-brutalist .bar-label {
+    font-size: 0.7em;
+    font-weight: bold;
+    text-align: center;
+    color: #000;
+}
+
+body.theme-brutalist .bar-value {
+    font-size: 0.8em;
+    font-weight: bold;
+    color: #000;
+}
+
+body.theme-brutalist .loading {
+    background: #fff;
+    border: 5px solid #000;
+    padding: 40px;
+    text-align: center;
+    font-size: 1.5em;
+    font-weight: bold;
+    box-shadow: 8px 8px 0 #000;
+    border-radius: 0;
+    color: #000;
+}
+
+body.theme-brutalist .error {
+    background: #ff6b6b;
+    color: #fff;
+    border: 5px solid #000;
+    padding: 30px;
+    margin-bottom: 20px;
+    font-weight: bold;
+    box-shadow: 8px 8px 0 #000;
+    border-radius: 0;
+}
+
+body.theme-brutalist .info-section {
+    background: #fff;
+    border: 4px solid #000;
+    padding: 20px;
+    margin-bottom: 15px;
+    box-shadow: 6px 6px 0 #000;
+    border-radius: 0;
+}
+
+@media (min-width: 600px) {
+    body.theme-brutalist .info-section {
+        border: 5px solid #000;
+        padding: 30px;
+        margin-bottom: 20px;
+        box-shadow: 8px 8px 0 #000;
+    }
+}
+
+body.theme-brutalist .info-section h3 {
+    font-size: 1.3em;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    color: #000;
+}
+
+@media (min-width: 600px) {
+    body.theme-brutalist .info-section h3 {
+        font-size: 1.5em;
+    }
+}
+
+body.theme-brutalist .warning-box {
+    background: #ffd700;
+    border: 4px solid #000;
+    padding: 20px;
+    margin-bottom: 20px;
+    font-weight: bold;
+    border-radius: 0;
+    color: #000;
+}
+
+body.theme-brutalist .info-details {
+    border: 3px solid #000;
+    margin-top: 20px;
+    border-radius: 0;
+    background: transparent;
+}
+
+body.theme-brutalist .info-details summary {
+    background: #1e90ff;
+    color: #fff;
+    padding: 15px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 1.1em;
+    border: none;
+    width: 100%;
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 0;
+}
+
+body.theme-brutalist .info-details summary:hover {
+    background: #1873cc;
+}
+
+body.theme-brutalist .info-details[open] summary {
+    border-bottom: 3px solid #000;
+}
+
+body.theme-brutalist .details-content {
+    padding: 20px;
+    background: #f9f9f9;
+    border-top: 3px solid #000;
+}
+
+body.theme-brutalist .info-section a {
+    display: inline-block;
+    background: #1e90ff;
+    color: #fff;
+    border: 4px solid #000;
+    padding: 15px 25px;
+    text-decoration: none;
+    font-weight: bold;
+    margin-top: 20px;
+    box-shadow: 6px 6px 0 #000;
+    transition: transform 0.1s;
+    border-radius: 0;
+}
+
+body.theme-brutalist .info-section a:hover {
+    transform: translate(2px, 2px);
+    box-shadow: 4px 4px 0 #000;
+}
+
+body.theme-brutalist .sauna-icon {
+    display: none;
+}
+
+body.theme-brutalist .theme-toggle {
+    position: fixed;
+    top: 15px;
+    right: 15px;
+    background: #1e90ff;
+    color: #fff;
+    border: 3px solid #000;
+    padding: 8px 12px;
+    font-weight: bold;
+    font-size: 0.85em;
+    cursor: pointer;
+    box-shadow: 3px 3px 0 #000;
+    z-index: 1000;
+    border-radius: 0;
+}
+
+body.theme-brutalist .theme-toggle:hover {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 #000;
+}
+
+.theme-toggle {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(102, 126, 234, 0.9);
+    color: #fff;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    padding: 8px 12px;
+    font-weight: bold;
+    font-size: 0.85em;
+    cursor: pointer;
+    border-radius: 8px;
+    z-index: 1000;
+    transition: all 0.3s ease;
+}
+
+.theme-toggle:hover {
+    background: rgba(102, 126, 234, 1);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
