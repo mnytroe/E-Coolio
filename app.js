@@ -325,6 +325,10 @@ function createMiniChart(historyData = []) {
     const ctx = canvas.getContext('2d');
     if (!ctx || historyData.length === 0) return canvas;
 
+    const isDarkMode = typeof window !== 'undefined' &&
+        typeof window.matchMedia === 'function' &&
+        window.matchMedia('(prefers-color-scheme: dark)').matches;
+
     const values = historyData.map(h => h.value);
     const weeks = historyData.map(h => h.week);
     
@@ -373,8 +377,8 @@ function createMiniChart(historyData = []) {
     });
 
     // Tegn ukenummer under hvert punkt
-    ctx.fillStyle = '#95a5a6';
-    ctx.font = '9px Segoe UI';
+    ctx.fillStyle = isDarkMode ? '#cbd5e1' : '#7f8c8d';
+    ctx.font = '11px Segoe UI';
     ctx.textBaseline = 'top';
     points.forEach(pt => {
         ctx.fillText(`uke ${pt.week}`, pt.x, canvas.height - 18);
@@ -388,6 +392,8 @@ function updateUI(result) {
     const content = document.getElementById('content');
     const valueDisplay = document.getElementById('valueDisplay');
     const statusText = document.getElementById('statusText');
+    const statusTextLabel = document.getElementById('statusTextLabel');
+    const statusIconPath = document.getElementById('statusIconPath');
     const weekInfo = document.getElementById('weekInfo');
     const error = document.getElementById('error');
     
@@ -432,11 +438,19 @@ function updateUI(result) {
     
     if (value >= CONFIG.THRESHOLD_HIGH) {
         valueDisplay.className = 'value-display red';
-        statusText.textContent = '⚠️ Ikke anbefalt for bading';
+        if (statusTextLabel) statusTextLabel.textContent = 'Ikke anbefalt for bading';
+        else statusText.textContent = 'Ikke anbefalt for bading';
+        if (statusIconPath) {
+            statusIconPath.setAttribute('d', 'M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.75c1.155 2-.289 4.5-2.598 4.5H4.644c-2.309 0-3.752-2.5-2.598-4.5L9.401 3.003zM12 8.25a.75.75 0 00-.75.75v3a.75.75 0 001.5 0v-3a.75.75 0 00-.75-.75zm0 6a.75.75 0 100 1.5.75.75 0 000-1.5z');
+        }
         statusText.className = 'status-text red';
     } else {
         valueDisplay.className = 'value-display green';
-        statusText.textContent = '✅ Trygt for bading';
+        if (statusTextLabel) statusTextLabel.textContent = 'Trygt for bading';
+        else statusText.textContent = 'Trygt for bading';
+        if (statusIconPath) {
+            statusIconPath.setAttribute('d', 'M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z');
+        }
         statusText.className = 'status-text green';
     }
     
