@@ -1094,13 +1094,6 @@ body.theme-brutalist .theme-toggle {
     transition: transform 0.1s, box-shadow 0.1s;
 }
 
-@media (min-width: 768px) {
-    body.theme-brutalist .theme-toggle {
-        top: 1rem;
-        bottom: auto;
-    }
-}
-
 body.theme-brutalist .theme-toggle:hover {
     transform: translate(1px, 1px);
     box-shadow: 1px 1px 0 0 var(--brutal-border);
