@@ -38,6 +38,11 @@ h1 {
     font-size: 1.1em;
 }
 
+/* Standard tema: vis utenfor, skjul innenfor */
+.subtitle-inside {
+    display: none;
+}
+
 .value-display {
     font-size: 4em;
     font-weight: bold;
@@ -302,6 +307,11 @@ h1 {
     justify-content: center;
 }
 
+/* Skjul history-chart i standard tema når tom */
+.history-chart:empty {
+    display: none;
+}
+
 /* Responsivt for mobil */
 @media (max-width: 600px) {
     .container {
@@ -391,95 +401,263 @@ h1 {
     }
 }
 
-/* === BRUTALIST TEMA === */
+/* === BRUTALIST HEADER (skjult i standard tema) === */
+
+.brutalist-header {
+    display: none;
+}
+
+/* === BRUTALIST TEMA (Neo-Brutalist) === */
 
 body.theme-brutalist {
-    font-family: 'Courier New', monospace;
-    background: #e8f4f8;
-    padding: 15px;
+    --brutal-background: hsl(45, 100%, 60%);
+    --brutal-foreground: hsl(0, 0%, 10%);
+    --brutal-card: hsl(45, 100%, 92%);
+    --brutal-card-foreground: hsl(0, 0%, 10%);
+    --brutal-primary: hsl(165, 70%, 40%);
+    --brutal-primary-foreground: hsl(0, 0%, 100%);
+    --brutal-secondary: hsl(330, 85%, 60%);
+    --brutal-secondary-foreground: hsl(0, 0%, 100%);
+    --brutal-muted: hsl(45, 60%, 75%);
+    --brutal-muted-foreground: hsl(0, 0%, 30%);
+    --brutal-success: hsl(165, 70%, 40%);
+    --brutal-success-foreground: hsl(0, 0%, 100%);
+    --brutal-warning: hsl(25, 100%, 55%);
+    --brutal-warning-foreground: hsl(0, 0%, 10%);
+    --brutal-destructive: hsl(0, 85%, 55%);
+    --brutal-destructive-foreground: hsl(0, 0%, 100%);
+    --brutal-border: hsl(0, 0%, 10%);
+    --brutal-shadow-offset: 5px;
+    --brutal-border-width: 3px;
+    --brutal-radius: 16px;
+    
+    font-family: 'Space Grotesk', sans-serif;
+    background: hsl(45, 100%, 60%); /* Overstyr gradient fra standard tema */
+    background-color: var(--brutal-background);
+    color: var(--brutal-foreground);
+    min-height: 100vh;
+    padding: 0;
     line-height: 1.6;
+    
+    /* Overstyr standard flex-layout for vertikal stabling */
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
+}
+
+body.theme-brutalist .font-mono {
+    font-family: 'Space Mono', monospace;
+}
+
+/* Brutalist Header */
+body.theme-brutalist .brutalist-header {
+    display: block;
+    background-color: var(--brutal-primary);
+    color: var(--brutal-primary-foreground);
+    border-bottom: var(--brutal-border-width) solid var(--brutal-border);
+    padding: 1rem 0;
+}
+
+@media (min-width: 768px) {
+    body.theme-brutalist .brutalist-header {
+        padding: 1.5rem 0;
+    }
+}
+
+body.theme-brutalist .header-container {
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+
+body.theme-brutalist .header-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    text-align: center;
+}
+
+@media (min-width: 768px) {
+    body.theme-brutalist .header-content {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        text-align: left;
+    }
+}
+
+body.theme-brutalist .header-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+body.theme-brutalist .header-h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: var(--brutal-primary-foreground);
+    margin: 0;
+}
+
+@media (min-width: 768px) {
+    body.theme-brutalist .header-h1 {
+        font-size: 1.875rem;
+    }
+}
+
+body.theme-brutalist .icon-badge {
+    background-color: var(--brutal-secondary);
+    color: var(--brutal-secondary-foreground);
+    padding: 0.5rem;
+    border: 2px solid var(--brutal-border);
+    border-radius: var(--brutal-radius);
+    box-shadow: 2px 2px 0 0 var(--brutal-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+body.theme-brutalist .icon-badge .icon {
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+body.theme-brutalist .header-temp-badges {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+}
+
+@media (min-width: 768px) {
+    body.theme-brutalist .header-temp-badges {
+        justify-content: flex-end;
+    }
+}
+
+body.theme-brutalist .header-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.875rem;
+    font-weight: 700;
+    border: 2px solid var(--brutal-border);
+    border-radius: var(--brutal-radius);
+    box-shadow: 2px 2px 0 0 var(--brutal-border);
+}
+
+body.theme-brutalist .header-badge svg {
+    margin-right: 0.5rem;
+}
+
+body.theme-brutalist .header-badge .badge-label {
+    margin-left: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 400;
+    opacity: 0.8;
+}
+
+body.theme-brutalist .badge-muted {
+    background-color: var(--brutal-muted);
+    color: var(--brutal-foreground);
+}
+
+body.theme-brutalist .badge-secondary {
+    background-color: var(--brutal-secondary);
+    color: var(--brutal-secondary-foreground);
+}
+
+/* Skjul original h1 og temperaturer i brutalist */
+body.theme-brutalist .container > h1,
+body.theme-brutalist .temperature-container {
+    display: none !important;
 }
 
 body.theme-brutalist .container {
     max-width: 800px;
     margin: 0 auto;
-    background: #fff;
-    border: 4px solid #000;
-    padding: 20px;
-    box-shadow: 6px 6px 0 #000;
+    padding: 1.5rem 1rem;
+    background: transparent;
+    border: none;
+    box-shadow: none;
     border-radius: 0;
 }
 
-@media (min-width: 600px) {
-    body.theme-brutalist {
-        padding: 20px;
-    }
-    
+@media (min-width: 768px) {
     body.theme-brutalist .container {
-        border: 5px solid #000;
-        padding: 30px;
-        box-shadow: 8px 8px 0 #000;
+        padding: 2.5rem 1rem;
     }
 }
 
 body.theme-brutalist h1 {
-    font-size: 2em;
-    font-weight: 900;
-    text-transform: uppercase;
-    margin-bottom: 15px;
-    color: #000;
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: var(--brutal-foreground);
     text-align: center;
+    margin-bottom: 1rem;
 }
 
-@media (min-width: 600px) {
+@media (min-width: 768px) {
     body.theme-brutalist h1 {
-        font-size: 3em;
+        font-size: 1.875rem;
     }
 }
 
 body.theme-brutalist .temperature-container {
-    gap: 10px;
-    margin: 15px 0;
+    display: flex;
+    justify-content: center;
+    gap: 0.75rem;
+    margin: 1rem 0;
 }
 
 body.theme-brutalist .temperature-display {
-    background: #1e90ff;
-    color: #fff;
-    border: 3px solid #000;
-    padding: 8px 12px;
-    font-weight: bold;
-    font-size: 0.85em;
-    box-shadow: 3px 3px 0 #000;
-    border-radius: 0;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.875rem;
+    font-weight: 700;
+    border: 2px solid var(--brutal-border);
+    border-radius: var(--brutal-radius);
+    box-shadow: 2px 2px 0 0 var(--brutal-border);
+    background-color: var(--brutal-muted);
+    color: var(--brutal-foreground);
 }
 
-@media (min-width: 600px) {
-    body.theme-brutalist .temperature-display {
-        padding: 8px 16px;
-        font-size: 0.9em;
-        box-shadow: 4px 4px 0 #000;
-    }
+body.theme-brutalist #seaTemperature {
+    background-color: var(--brutal-secondary);
+    color: var(--brutal-secondary-foreground);
 }
 
 body.theme-brutalist .subtitle {
-    font-size: 1em;
-    margin-bottom: 20px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.875rem;
     text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--brutal-muted-foreground);
     text-align: center;
-    color: #000;
+    margin-bottom: 1rem;
 }
 
-@media (min-width: 600px) {
-    body.theme-brutalist .subtitle {
-        font-size: 1.2em;
-    }
+/* Brutalist: skjul utenfor, vis innenfor */
+body.theme-brutalist .subtitle-outside {
+    display: none;
+}
+
+body.theme-brutalist .subtitle-inside {
+    display: block;
 }
 
 body.theme-brutalist .value-display {
-    font-size: 3.5em;
-    font-weight: 900;
-    color: #1e90ff;
-    margin: 20px 0;
+    font-size: 3.75rem;
+    font-weight: 700;
+    color: var(--brutal-foreground);
+    margin: 0.75rem 0;
     text-align: center;
     background: transparent;
     border: none;
@@ -488,92 +666,129 @@ body.theme-brutalist .value-display {
     border-radius: 0;
 }
 
-@media (min-width: 600px) {
+@media (min-width: 768px) {
     body.theme-brutalist .value-display {
-        font-size: 5em;
+        font-size: 5rem;
+        margin: 1rem 0;
     }
 }
 
-body.theme-brutalist .value-display.green {
-    color: #1e90ff;
-    background: transparent;
-}
-
+body.theme-brutalist .value-display.green,
 body.theme-brutalist .value-display.red {
-    color: #ff6b6b;
     background: transparent;
+    color: var(--brutal-foreground);
 }
 
 body.theme-brutalist .status-text {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    padding: 15px;
-    background: #90ee90;
-    border: 3px solid #000;
-    margin: 20px 0;
-    font-weight: bold;
-    font-size: 1em;
-    border-radius: 0;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 1rem;
+    font-weight: 700;
+    border: 2px solid var(--brutal-border);
+    border-radius: var(--brutal-radius);
+    box-shadow: 2px 2px 0 0 var(--brutal-border);
+    background-color: var(--brutal-success);
+    color: var(--brutal-success-foreground);
+    margin: 0 auto 0.75rem;
+    width: auto;
 }
 
-@media (min-width: 600px) {
+@media (min-width: 768px) {
     body.theme-brutalist .status-text {
-        gap: 15px;
-        padding: 20px;
-        border: 4px solid #000;
-        font-size: 1.2em;
+        font-size: 1.125rem;
     }
 }
 
 body.theme-brutalist .status-text.warning,
 body.theme-brutalist .status-text.red {
-    background: #ff6b6b;
-    color: #fff;
+    background-color: var(--brutal-destructive);
+    color: var(--brutal-destructive-foreground);
+}
+
+body.theme-brutalist .status-text.green {
+    background-color: var(--brutal-success);
+    color: var(--brutal-success-foreground);
 }
 
 body.theme-brutalist .status-icon {
-    font-size: 2em;
+    width: 1.25rem;
+    height: 1.25rem;
 }
 
 body.theme-brutalist .week-info {
-    margin: 20px 0;
-    padding: 15px;
-    background: #f0f0f0;
-    border: 3px solid #000;
-    font-weight: bold;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.875rem;
+    color: var(--brutal-muted-foreground);
     text-align: center;
-    border-radius: 0;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: none;
 }
 
 body.theme-brutalist .estimated {
-    color: #666;
-    font-size: 0.9em;
-    margin-top: 5px;
+    color: var(--brutal-muted-foreground);
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+}
+
+/* Brutalist Card for chart and bacteria display */
+body.theme-brutalist #content {
+    background-color: var(--brutal-card);
+    border: var(--brutal-border-width) solid var(--brutal-border);
+    border-radius: var(--brutal-radius);
+    box-shadow: var(--brutal-shadow-offset) var(--brutal-shadow-offset) 0 0 var(--brutal-border);
+    padding: 1rem 1.5rem;
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+@media (min-width: 768px) {
+    body.theme-brutalist #content {
+        padding: 1.5rem 2rem;
+    }
+}
+
+body.theme-brutalist .history-chart {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    display: block;
+    width: 100%;
 }
 
 body.theme-brutalist .mini-graph {
-    margin-top: 30px;
-    padding: 20px;
-    background: #f9f9f9;
-    border: 3px solid #000;
-    border-radius: 0;
+    background-color: var(--brutal-card);
+    border: var(--brutal-border-width) solid var(--brutal-border);
+    border-radius: var(--brutal-radius);
+    box-shadow: var(--brutal-shadow-offset) var(--brutal-shadow-offset) 0 0 var(--brutal-border);
+    padding: 1.5rem;
+    width: 100%;
+}
+
+@media (min-width: 768px) {
+    body.theme-brutalist .mini-graph {
+        padding: 1.5rem;
+    }
 }
 
 body.theme-brutalist .mini-graph h3 {
-    margin-bottom: 15px;
-    font-size: 1em;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.875rem;
     text-transform: uppercase;
-    color: #000;
+    letter-spacing: 0.05em;
+    color: var(--brutal-muted-foreground);
+    margin-bottom: 1rem;
 }
 
 body.theme-brutalist .graph-bars {
     display: flex;
-    gap: 10px;
     align-items: flex-end;
-    height: 200px;
-    margin-top: 15px;
+    justify-content: space-between;
+    gap: 0.5rem;
 }
 
 body.theme-brutalist .bar-container {
@@ -581,187 +796,279 @@ body.theme-brutalist .bar-container {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
-    height: 100%;
+    gap: 0.5rem;
+}
+
+body.theme-brutalist .bar-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--brutal-muted-foreground);
+}
+
+body.theme-brutalist .bar-wrapper {
+    width: 100%;
+    height: 8rem;
+    display: flex;
+    flex-direction: column;
     justify-content: flex-end;
+}
+
+@media (min-width: 768px) {
+    body.theme-brutalist .bar-wrapper {
+        height: 10rem;
+    }
 }
 
 body.theme-brutalist .bar {
     width: 100%;
-    background: #1e90ff;
-    border: 3px solid #000;
-    position: relative;
-    min-height: 10px;
+    border: 2px solid var(--brutal-border);
+    transition: height 0.3s ease;
+    background-color: var(--brutal-secondary);
     border-radius: 0;
+}
+
+body.theme-brutalist .bar.warning {
+    background-color: var(--brutal-warning);
 }
 
 body.theme-brutalist .bar-label {
-    font-size: 0.7em;
-    font-weight: bold;
-    text-align: center;
-    color: #000;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--brutal-foreground);
 }
 
-body.theme-brutalist .bar-value {
-    font-size: 0.8em;
-    font-weight: bold;
-    color: #000;
+body.theme-brutalist .chart-legend {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1rem;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--brutal-muted-foreground);
+}
+
+body.theme-brutalist .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+body.theme-brutalist .legend-color {
+    width: 0.75rem;
+    height: 0.75rem;
+    border: 2px solid var(--brutal-border);
+}
+
+body.theme-brutalist .legend-color.safe {
+    background-color: var(--brutal-secondary);
+}
+
+body.theme-brutalist .legend-color.warning {
+    background-color: var(--brutal-warning);
 }
 
 body.theme-brutalist .loading {
-    background: #fff;
-    border: 5px solid #000;
-    padding: 40px;
+    background-color: var(--brutal-card);
+    border: var(--brutal-border-width) solid var(--brutal-border);
+    border-radius: var(--brutal-radius);
+    box-shadow: var(--brutal-shadow-offset) var(--brutal-shadow-offset) 0 0 var(--brutal-border);
+    padding: 2rem;
     text-align: center;
-    font-size: 1.5em;
-    font-weight: bold;
-    box-shadow: 8px 8px 0 #000;
-    border-radius: 0;
-    color: #000;
+    font-family: 'Space Mono', monospace;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--brutal-foreground);
 }
 
 body.theme-brutalist .error {
-    background: #ff6b6b;
-    color: #fff;
-    border: 5px solid #000;
-    padding: 30px;
-    margin-bottom: 20px;
-    font-weight: bold;
-    box-shadow: 8px 8px 0 #000;
-    border-radius: 0;
+    background-color: var(--brutal-destructive);
+    color: var(--brutal-destructive-foreground);
+    border: var(--brutal-border-width) solid var(--brutal-border);
+    border-radius: var(--brutal-radius);
+    box-shadow: var(--brutal-shadow-offset) var(--brutal-shadow-offset) 0 0 var(--brutal-border);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    font-weight: 700;
 }
 
 body.theme-brutalist .info-section {
-    background: #fff;
-    border: 4px solid #000;
-    padding: 20px;
-    margin-bottom: 15px;
-    box-shadow: 6px 6px 0 #000;
+    background: transparent;
+    border: none;
     border-radius: 0;
-    color: #000;
+    box-shadow: none;
+    padding: 0;
+    margin-bottom: 1rem;
+    color: var(--brutal-foreground);
+}
+
+/* Skjul original h3 i brutalist - vi bruker tittel inne i warning-box */
+body.theme-brutalist .info-section > h3 {
+    display: none;
 }
 
 body.theme-brutalist .info-section li,
 body.theme-brutalist .info-section p,
 body.theme-brutalist .info-section strong {
-    color: #000;
+    color: var(--brutal-foreground);
 }
 
 body.theme-brutalist .info-section li:before {
-    color: #000;
+    color: var(--brutal-secondary);
 }
 
 body.theme-brutalist .details-content {
-    color: #000;
-}
-
-body.theme-brutalist .sampling-info {
-    background: #e7f3ff;
-    border-left: 4px solid #2196F3;
-    border: 3px solid #000;
-    padding: 15px;
-    margin: 15px 0;
-    border-radius: 0;
-    color: #333;
-}
-
-body.theme-brutalist .sampling-info strong {
-    color: #000;
-    font-weight: 900;
-}
-
-@media (min-width: 600px) {
-    body.theme-brutalist .info-section {
-        border: 5px solid #000;
-        padding: 30px;
-        margin-bottom: 20px;
-        box-shadow: 8px 8px 0 #000;
-    }
-}
-
-body.theme-brutalist .info-section h3 {
-    font-size: 1.3em;
-    margin-bottom: 20px;
-    text-transform: uppercase;
-    color: #000;
-}
-
-@media (min-width: 600px) {
-    body.theme-brutalist .info-section h3 {
-        font-size: 1.5em;
-    }
+    color: var(--brutal-foreground);
+    padding: 0 0 0.5rem;
 }
 
 body.theme-brutalist .warning-box {
-    background: #ffd700;
-    border: 4px solid #000;
-    padding: 20px;
-    margin-bottom: 20px;
-    font-weight: bold;
-    border-radius: 0;
-    color: #000;
+    background-color: hsl(25, 100%, 70%);
+    border: var(--brutal-border-width) solid var(--brutal-border);
+    border-radius: var(--brutal-radius);
+    box-shadow: var(--brutal-shadow-offset) var(--brutal-shadow-offset) 0 0 var(--brutal-border);
+    padding: 1rem;
+    margin-bottom: 1rem;
+    color: var(--brutal-foreground);
+}
+
+@media (min-width: 768px) {
+    body.theme-brutalist .warning-box {
+        padding: 1.5rem;
+    }
+}
+
+body.theme-brutalist .warning-box-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+body.theme-brutalist .warning-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+}
+
+body.theme-brutalist .warning-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.125rem;
+    font-weight: 700;
+}
+
+body.theme-brutalist .warning-text {
+    font-size: 0.9rem;
+    margin: 0;
+    opacity: 0.9;
 }
 
 body.theme-brutalist .warning-box strong {
-    color: #000;
-    font-weight: 900;
-    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.2);
+    display: none;
+}
+
+body.theme-brutalist .warning-box br {
+    display: none;
+}
+
+body.theme-brutalist .sampling-info {
+    background-color: hsla(45, 60%, 75%, 0.5);
+    border: 2px solid var(--brutal-border);
+    border-radius: var(--brutal-radius);
+    padding: 1rem;
+    margin: 1rem 0;
+    color: var(--brutal-foreground);
+}
+
+body.theme-brutalist .sampling-info strong {
+    color: var(--brutal-foreground);
+    font-weight: 700;
 }
 
 body.theme-brutalist .info-details {
-    border: 3px solid #000;
-    margin-top: 20px;
-    border-radius: 0;
-    background: transparent;
+    background-color: var(--brutal-card);
+    border: var(--brutal-border-width) solid var(--brutal-border);
+    border-radius: var(--brutal-radius);
+    box-shadow: var(--brutal-shadow-offset) var(--brutal-shadow-offset) 0 0 var(--brutal-border);
+    margin-bottom: 1rem;
+    overflow: hidden;
 }
 
 body.theme-brutalist .info-details summary {
-    background: #1e90ff;
-    color: #fff;
-    padding: 15px;
-    cursor: pointer;
-    font-weight: bold;
-    font-size: 1.1em;
-    border: none;
-    width: 100%;
-    text-align: left;
+    padding: 1rem;
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    border-radius: 0;
+    justify-content: space-between;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: none;
+    cursor: pointer;
+    color: var(--brutal-foreground);
+    transition: background-color 0.2s;
+    border-radius: var(--brutal-radius);
 }
 
 body.theme-brutalist .info-details summary:hover {
-    background: #1873cc;
+    background-color: hsla(45, 60%, 75%, 0.5);
+}
+
+body.theme-brutalist .info-details summary::after {
+    content: "▼";
+    font-size: 0.75rem;
+    color: var(--brutal-foreground);
 }
 
 body.theme-brutalist .info-details[open] summary {
-    border-bottom: 3px solid #000;
+    border-bottom: 2px solid var(--brutal-border);
+    border-radius: var(--brutal-radius) var(--brutal-radius) 0 0;
 }
 
-body.theme-brutalist .details-content {
-    padding: 20px;
-    background: #f9f9f9;
-    border-top: 3px solid #000;
+body.theme-brutalist .info-details[open] summary::after {
+    content: "▲";
+}
+
+body.theme-brutalist .info-section > p {
+    margin-top: 0 !important;
 }
 
 body.theme-brutalist .info-section a {
-    display: inline-block;
-    background: #1e90ff;
-    color: #fff;
-    border: 4px solid #000;
-    padding: 15px 25px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 1rem 1.5rem;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
     text-decoration: none;
-    font-weight: bold;
-    margin-top: 20px;
-    box-shadow: 6px 6px 0 #000;
-    transition: transform 0.1s;
-    border-radius: 0;
+    background-color: var(--brutal-primary);
+    color: var(--brutal-primary-foreground);
+    border: var(--brutal-border-width) solid var(--brutal-border);
+    border-radius: var(--brutal-radius);
+    box-shadow: var(--brutal-shadow-offset) var(--brutal-shadow-offset) 0 0 var(--brutal-border);
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+
+body.theme-brutalist .info-section a .icon-external {
+    width: 1rem;
+    height: 1rem;
+    stroke: currentColor;
 }
 
 body.theme-brutalist .info-section a:hover {
     transform: translate(2px, 2px);
-    box-shadow: 4px 4px 0 #000;
+    box-shadow: 3px 3px 0 0 var(--brutal-border);
+}
+
+body.theme-brutalist .info-section a:active {
+    transform: translate(5px, 5px);
+    box-shadow: 0 0 0 0 var(--brutal-border);
 }
 
 body.theme-brutalist .sauna-icon {
@@ -770,23 +1077,33 @@ body.theme-brutalist .sauna-icon {
 
 body.theme-brutalist .theme-toggle {
     position: fixed;
-    top: 15px;
-    right: 15px;
-    background: #1e90ff;
-    color: #fff;
-    border: 3px solid #000;
-    padding: 8px 12px;
-    font-weight: bold;
-    font-size: 0.85em;
+    bottom: 1rem;
+    right: 1rem;
+    top: auto;
+    background-color: var(--brutal-primary);
+    color: var(--brutal-primary-foreground);
+    border: 2px solid var(--brutal-border);
+    border-radius: var(--brutal-radius);
+    padding: 0.5rem 0.75rem;
+    font-family: 'Space Mono', monospace;
+    font-weight: 700;
+    font-size: 0.75rem;
     cursor: pointer;
-    box-shadow: 3px 3px 0 #000;
+    box-shadow: 2px 2px 0 0 var(--brutal-border);
     z-index: 1000;
-    border-radius: 0;
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+
+@media (min-width: 768px) {
+    body.theme-brutalist .theme-toggle {
+        top: 1rem;
+        bottom: auto;
+    }
 }
 
 body.theme-brutalist .theme-toggle:hover {
-    transform: translate(2px, 2px);
-    box-shadow: 1px 1px 0 #000;
+    transform: translate(1px, 1px);
+    box-shadow: 1px 1px 0 0 var(--brutal-border);
 }
 
 .theme-toggle {

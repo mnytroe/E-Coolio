@@ -77,9 +77,18 @@ async function updateTemperature() {
         const tempElement = document.getElementById('temperature');
         const tempValue = document.getElementById('tempValue');
         
+        // Oppdater standard temperatur-visning
         if (tempElement && tempValue && temp !== null && temp !== undefined) {
             tempValue.textContent = Math.round(temp);
             tempElement.style.display = 'flex';
+        }
+        
+        // Oppdater header temperatur for brutalist-tema
+        const headerTempElement = document.getElementById('headerTemperature');
+        const headerTempValue = document.getElementById('headerTempValue');
+        if (headerTempElement && headerTempValue && temp !== null && temp !== undefined) {
+            headerTempValue.textContent = Math.round(temp);
+            headerTempElement.style.display = 'inline-flex';
         }
     } catch (error) {
         log('Kunne ikke hente temperatur:', error);
@@ -190,10 +199,19 @@ async function updateSeaTemperature() {
         const seaTempElement = document.getElementById('seaTemperature');
         const seaTempValue = document.getElementById('seaTempValue');
         
+        // Oppdater standard sjøtemperatur-visning
         if (seaTempElement && seaTempValue && temp !== null && temp !== undefined) {
             seaTempValue.textContent = Math.round(temp);
             seaTempElement.style.display = 'flex';
             log('Badetemperatur oppdatert i UI:', Math.round(temp));
+        }
+        
+        // Oppdater header sjøtemperatur for brutalist-tema
+        const headerSeaTempElement = document.getElementById('headerSeaTemperature');
+        const headerSeaTempValue = document.getElementById('headerSeaTempValue');
+        if (headerSeaTempElement && headerSeaTempValue && temp !== null && temp !== undefined) {
+            headerSeaTempValue.textContent = Math.round(temp);
+            headerSeaTempElement.style.display = 'inline-flex';
         }
     } catch (error) {
         log('Kunne ikke hente badetemperatur:', error);
@@ -392,26 +410,39 @@ function createMiniChart(historyData = []) {
 function createBarChart(historyData = []) {
     if (!historyData || historyData.length === 0) return null;
     
-    const values = historyData.map(h => h.value);
-    const weeks = historyData.map(h => h.week);
-    const maxVal = Math.max(...values);
+    const threshold = CONFIG.THRESHOLD_HIGH;
+    const maxVal = Math.max(...historyData.map(h => h.value), threshold);
     
     const container = document.createElement('div');
     container.className = 'graph-bars';
     
     historyData.forEach((item) => {
         const heightPercent = maxVal > 0 ? (item.value / maxVal) * 100 : 0;
+        const isSafe = item.value <= threshold;
         const barContainer = document.createElement('div');
         barContainer.className = 'bar-container';
         barContainer.innerHTML = `
             <div class="bar-value">${Math.round(item.value)}</div>
-            <div class="bar" style="height: ${heightPercent}%;"></div>
+            <div class="bar-wrapper"><div class="bar ${isSafe ? '' : 'warning'}" style="height: ${Math.max(heightPercent, 8)}%;"></div></div>
             <div class="bar-label">Uke ${item.week}</div>
         `;
         container.appendChild(barContainer);
     });
     
-    return container;
+    // Legg til legend
+    const legend = document.createElement('div');
+    legend.className = 'chart-legend';
+    legend.innerHTML = `
+        <div class="legend-item"><div class="legend-color safe"></div><span>Under grense</span></div>
+        <div class="legend-item"><div class="legend-color warning"></div><span>Over grense</span></div>
+    `;
+    
+    // Returner en wrapper med både bars og legend
+    const wrapper = document.createElement('div');
+    wrapper.appendChild(container);
+    wrapper.appendChild(legend);
+    
+    return wrapper;
 }
 
 // === TEMA-FUNKSJONALITET ===
