@@ -548,7 +548,7 @@ function updateUI(result) {
     if (value === null || isNaN(value)) {
         error.style.display = 'block';
         if (errorMessage) {
-            error.innerHTML = errorMessage.replace(/\n/g, '<br>');
+            error.textContent = errorMessage;
         } else {
             const { week: currentWeek } = getWeekNumber(new Date());
             error.textContent = 'Kunne ikke finne verdi for gjeldende uke. Sjekk at dataene har verdier for uke ' + currentWeek + '.';
@@ -669,7 +669,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (error) {
         document.getElementById('loading').style.display = 'none';
         document.getElementById('error').style.display = 'block';
-        document.getElementById('error').innerHTML = error.message.replace(/\n/g, '<br>');
+        document.getElementById('error').textContent = error.message;
     }
 });
 

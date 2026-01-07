@@ -1,6 +1,24 @@
 /* Havet Arena - Badevilkår */
 /* Hav-inspirert fargpalett */
 
+/* Skip-link for tilgjengelighet */
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: #00b4d8;
+    color: #001d3d;
+    padding: 8px 16px;
+    z-index: 9999;
+    font-weight: bold;
+    text-decoration: none;
+    border-radius: 0 0 8px 0;
+}
+
+.skip-link:focus {
+    top: 0;
+}
+
 :root {
     --ocean-deep: #023e8a;
     --ocean-mid: #0077b6;
