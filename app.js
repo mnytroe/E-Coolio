@@ -367,7 +367,7 @@ function createMiniChart(historyData = []) {
     });
 
     // Tegn linjen
-    ctx.strokeStyle = '#667eea';
+    ctx.strokeStyle = '#0077b6';
     ctx.lineWidth = 2;
     ctx.beginPath();
     points.forEach((pt, idx) => {
@@ -378,7 +378,7 @@ function createMiniChart(historyData = []) {
 
     // Tegn punkter
     ctx.fillStyle = '#ffffff';
-    ctx.strokeStyle = '#667eea';
+    ctx.strokeStyle = '#0077b6';
     points.forEach(pt => {
         ctx.beginPath();
         ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
@@ -387,7 +387,7 @@ function createMiniChart(historyData = []) {
     });
 
     // Tegn verdier over hvert punkt
-    ctx.fillStyle = '#7f8c8d';
+    ctx.fillStyle = '#90e0ef';
     ctx.font = '10px Segoe UI';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
@@ -396,7 +396,7 @@ function createMiniChart(historyData = []) {
     });
 
     // Tegn ukenummer under hvert punkt
-    ctx.fillStyle = isDarkMode ? '#cbd5e1' : '#7f8c8d';
+    ctx.fillStyle = '#90e0ef';
     ctx.font = '11px Segoe UI';
     ctx.textBaseline = 'top';
     points.forEach(pt => {

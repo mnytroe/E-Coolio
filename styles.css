@@ -1,4 +1,17 @@
 /* Havet Arena - Badevilkår */
+/* Hav-inspirert fargpalett */
+
+:root {
+    --ocean-deep: #023e8a;
+    --ocean-mid: #0077b6;
+    --ocean-light: #00b4d8;
+    --ocean-foam: #90e0ef;
+    --ocean-mist: #caf0f8;
+    --sand: #f8f9fa;
+    --coral: #ff6b6b;
+    --seaweed: #2d6a4f;
+    --accent: var(--ocean-mid);
+}
 
 * {
     margin: 0;
@@ -8,7 +21,7 @@
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #023e8a 0%, #001d3d 100%);
     min-height: 100vh;
     display: flex;
     justify-content: center;
@@ -17,23 +30,24 @@ body {
 }
 
 .container {
-    background: rgba(255, 255, 255, 0.95);
+    background: rgba(1, 42, 74, 0.95);
     border-radius: 20px;
     padding: 40px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
     text-align: center;
     max-width: 600px;
     width: 100%;
+    color: #caf0f8;
 }
 
 h1 {
-    color: #2c3e50;
+    color: #caf0f8;
     margin-bottom: 10px;
     font-size: 2.5em;
 }
 
 .subtitle {
-    color: #7f8c8d;
+    color: #90e0ef;
     margin-bottom: 30px;
     font-size: 1.1em;
 }
@@ -87,7 +101,7 @@ h1 {
 }
 
 .week-info {
-    color: #7f8c8d;
+    color: #90e0ef;
     margin-top: 20px;
     font-size: 0.9em;
 }
@@ -101,7 +115,7 @@ h1 {
 }
 
 .temperature-display {
-    color: #2c3e50;
+    color: #caf0f8;
     font-size: 1.2em;
     font-weight: 500;
     display: flex;
@@ -133,7 +147,7 @@ h1 {
 }
 
 .loading {
-    color: #7f8c8d;
+    color: #90e0ef;
     font-size: 1.2em;
     position: relative;
 }
@@ -150,8 +164,8 @@ h1 {
 }
 
 .error {
-    color: #e74c3c;
-    background: #ffe6e6;
+    color: #ff6b6b;
+    background: rgba(255, 107, 107, 0.15);
     padding: 15px;
     border-radius: 10px;
     margin-top: 20px;
@@ -161,7 +175,7 @@ h1 {
 }
 
 .error a {
-    color: #667eea;
+    color: #00b4d8;
     text-decoration: underline;
 }
 
@@ -169,21 +183,21 @@ h1 {
     display: flex;
     justify-content: center;
     margin-bottom: 20px;
-    color: #667eea;
+    color: #00b4d8;
 }
 
 .info-section {
     margin-top: 30px;
     padding: 20px;
-    background: #f8f9fa;
+    background: rgba(0, 29, 61, 0.6);
     border-radius: 10px;
     text-align: left;
     font-size: 0.9em;
-    color: #2c3e50;
+    color: #caf0f8;
 }
 
 .info-section h3 {
-    color: #2c3e50;
+    color: #caf0f8;
     margin-bottom: 15px;
     font-size: 1.1em;
     text-align: center;
@@ -196,14 +210,14 @@ h1 {
 .section-icon {
     width: 1.2em;
     height: 1.2em;
-    color: #667eea;
+    color: #00b4d8;
 }
 
 .info-details {
     margin: 15px 0;
     border-radius: 10px;
-    border: 1px solid rgba(102, 126, 234, 0.22);
-    background: rgba(102, 126, 234, 0.06);
+    border: 1px solid rgba(0, 180, 216, 0.3);
+    background: rgba(0, 180, 216, 0.1);
     overflow: clip;
 }
 
@@ -211,7 +225,7 @@ h1 {
     cursor: pointer;
     padding: 12px 14px;
     font-weight: 700;
-    color: #2c3e50;
+    color: #caf0f8;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -226,13 +240,13 @@ h1 {
 .info-details summary::after {
     content: "+";
     font-weight: 800;
-    color: #667eea;
+    color: var(--ocean-mid);
     line-height: 1;
     flex: 0 0 auto;
 }
 
 .info-details[open] summary {
-    border-bottom: 1px solid rgba(102, 126, 234, 0.18);
+    border-bottom: 1px solid rgba(0, 119, 182, 0.2);
 }
 
 .info-details[open] summary::after {
@@ -240,13 +254,14 @@ h1 {
 }
 
 .info-details summary:focus-visible {
-    outline: 3px solid rgba(102, 126, 234, 0.45);
+    outline: 3px solid rgba(0, 119, 182, 0.5);
     outline-offset: 2px;
     border-radius: 8px;
 }
 
 .details-content {
     padding: 0 14px 14px;
+    color: #caf0f8;
 }
 
 .sublist {
@@ -269,12 +284,12 @@ h1 {
     content: "•";
     position: absolute;
     left: 10px;
-    color: #667eea;
+    color: #00b4d8;
     font-weight: bold;
 }
 
 .info-section a {
-    color: #667eea;
+    color: #00b4d8;
     text-decoration: none;
     font-weight: 600;
 }
@@ -284,21 +299,23 @@ h1 {
 }
 
 .warning-box {
-    background: #fff3cd;
+    background: rgba(255, 193, 7, 0.15);
     border-left: 4px solid #ffc107;
     padding: 15px;
     margin: 15px 0;
     border-radius: 5px;
     font-size: 0.9em;
+    color: #ffeeba;
 }
 
 .sampling-info {
-    background: #e7f3ff;
-    border-left: 4px solid #2196F3;
+    background: rgba(0, 180, 216, 0.15);
+    border-left: 4px solid #00b4d8;
     padding: 15px;
     margin: 15px 0;
     border-radius: 5px;
     font-size: 0.9em;
+    color: #caf0f8;
 }
 
 .history-chart {
@@ -336,27 +353,27 @@ h1 {
 /* Mørk modus */
 @media (prefers-color-scheme: dark) {
     body {
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        background: linear-gradient(135deg, #023e8a 0%, #001d3d 100%);
     }
     
     .container {
-        background: rgba(30, 30, 46, 0.95);
-        color: #e0e0e0;
+        background: rgba(1, 42, 74, 0.95);
+        color: #caf0f8;
     }
     
     h1, .info-section h3 {
-        color: #e0e0e0;
+        color: #caf0f8;
     }
 
     .section-icon {
-        color: #9fa8ff;
+        color: #00b4d8;
     }
 
     .temperature-display {
-        color: #e0e0e0;
+        color: #caf0f8;
     }
     .sauna-icon {
-        color: #9fa8ff;
+        color: #00b4d8;
     }
 
     .temperature-container {
@@ -364,21 +381,21 @@ h1 {
     }
 
     .info-section {
-        background: #202133;
-        color: #e0e0e0;
+        background: rgba(0, 29, 61, 0.8);
+        color: #caf0f8;
     }
 
     .info-details {
-        border-color: rgba(159, 168, 255, 0.25);
-        background: rgba(159, 168, 255, 0.08);
+        border-color: rgba(0, 180, 216, 0.3);
+        background: rgba(0, 180, 216, 0.1);
     }
 
     .info-details summary {
-        color: #e0e0e0;
+        color: #caf0f8;
     }
 
     .info-details summary::after {
-        color: #9fa8ff;
+        color: #00b4d8;
     }
 
     .warning-box {
@@ -392,12 +409,12 @@ h1 {
     }
 
     .sampling-info {
-        background: #1b2a3d;
-        border-left-color: #64b5f6;
+        background: rgba(0, 77, 128, 0.5);
+        border-left-color: #90e0ef;
     }
 
     .info-section a {
-        color: #9fa8ff;
+        color: #00b4d8;
     }
 }
 
@@ -1103,7 +1120,7 @@ body.theme-brutalist .theme-toggle:hover {
     position: fixed;
     top: 20px;
     right: 20px;
-    background: rgba(102, 126, 234, 0.9);
+    background: rgba(0, 119, 182, 0.9);
     color: #fff;
     border: 2px solid rgba(255, 255, 255, 0.3);
     padding: 8px 12px;
@@ -1116,7 +1133,7 @@ body.theme-brutalist .theme-toggle:hover {
 }
 
 .theme-toggle:hover {
-    background: rgba(102, 126, 234, 1);
+    background: rgba(0, 119, 182, 1);
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
