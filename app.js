@@ -388,7 +388,7 @@ function createMiniChart(historyData = []) {
 
     // Tegn verdier over hvert punkt
     ctx.fillStyle = '#90e0ef';
-    ctx.font = '10px Segoe UI';
+    ctx.font = '10px DM Sans';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     points.forEach(pt => {
@@ -397,7 +397,7 @@ function createMiniChart(historyData = []) {
 
     // Tegn ukenummer under hvert punkt
     ctx.fillStyle = '#90e0ef';
-    ctx.font = '11px Segoe UI';
+    ctx.font = '11px DM Sans';
     ctx.textBaseline = 'top';
     points.forEach(pt => {
         ctx.fillText(`uke ${pt.week}`, pt.x, canvas.height - 18);

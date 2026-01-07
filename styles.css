@@ -38,7 +38,7 @@
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     background: linear-gradient(135deg, #023e8a 0%, #001d3d 100%);
     min-height: 100vh;
     display: flex;
@@ -466,7 +466,7 @@ body.theme-brutalist {
     --brutal-border-width: 3px;
     --brutal-radius: 16px;
     
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: 'DM Sans', sans-serif;
     background: hsl(45, 100%, 60%); /* Overstyr gradient fra standard tema */
     background-color: var(--brutal-background);
     color: var(--brutal-foreground);
@@ -482,7 +482,7 @@ body.theme-brutalist {
 }
 
 body.theme-brutalist .font-mono {
-    font-family: 'Space Mono', monospace;
+    font-family: 'DM Mono', monospace;
 }
 
 /* Brutalist Header */
@@ -577,7 +577,7 @@ body.theme-brutalist .header-badge {
     display: inline-flex;
     align-items: center;
     padding: 0.25rem 0.75rem;
-    font-family: 'Space Mono', monospace;
+    font-family: 'DM Mono', monospace;
     font-size: 0.875rem;
     font-weight: 700;
     border: 2px solid var(--brutal-border);
@@ -654,7 +654,7 @@ body.theme-brutalist .temperature-display {
     display: inline-flex;
     align-items: center;
     padding: 0.25rem 0.75rem;
-    font-family: 'Space Mono', monospace;
+    font-family: 'DM Mono', monospace;
     font-size: 0.875rem;
     font-weight: 700;
     border: 2px solid var(--brutal-border);
@@ -670,7 +670,7 @@ body.theme-brutalist #seaTemperature {
 }
 
 body.theme-brutalist .subtitle {
-    font-family: 'Space Mono', monospace;
+    font-family: 'DM Mono', monospace;
     font-size: 0.875rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -720,7 +720,7 @@ body.theme-brutalist .status-text {
     justify-content: center;
     gap: 0.5rem;
     padding: 0.5rem 1rem;
-    font-family: 'Space Mono', monospace;
+    font-family: 'DM Mono', monospace;
     font-size: 1rem;
     font-weight: 700;
     border: 2px solid var(--brutal-border);
@@ -755,7 +755,7 @@ body.theme-brutalist .status-icon {
 }
 
 body.theme-brutalist .week-info {
-    font-family: 'Space Mono', monospace;
+    font-family: 'DM Mono', monospace;
     font-size: 0.875rem;
     color: var(--brutal-muted-foreground);
     text-align: center;
@@ -811,7 +811,7 @@ body.theme-brutalist .mini-graph {
 }
 
 body.theme-brutalist .mini-graph h3 {
-    font-family: 'Space Mono', monospace;
+    font-family: 'DM Mono', monospace;
     font-size: 0.875rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -835,7 +835,7 @@ body.theme-brutalist .bar-container {
 }
 
 body.theme-brutalist .bar-value {
-    font-family: 'Space Mono', monospace;
+    font-family: 'DM Mono', monospace;
     font-size: 0.75rem;
     color: var(--brutal-muted-foreground);
 }
@@ -867,7 +867,7 @@ body.theme-brutalist .bar.warning {
 }
 
 body.theme-brutalist .bar-label {
-    font-family: 'Space Mono', monospace;
+    font-family: 'DM Mono', monospace;
     font-size: 0.75rem;
     font-weight: 700;
     color: var(--brutal-foreground);
@@ -879,7 +879,7 @@ body.theme-brutalist .chart-legend {
     justify-content: center;
     gap: 1rem;
     margin-top: 1rem;
-    font-family: 'Space Mono', monospace;
+    font-family: 'DM Mono', monospace;
     font-size: 0.75rem;
     color: var(--brutal-muted-foreground);
 }
@@ -911,7 +911,7 @@ body.theme-brutalist .loading {
     box-shadow: var(--brutal-shadow-offset) var(--brutal-shadow-offset) 0 0 var(--brutal-border);
     padding: 2rem;
     text-align: center;
-    font-family: 'Space Mono', monospace;
+    font-family: 'DM Mono', monospace;
     font-size: 1rem;
     font-weight: 700;
     color: var(--brutal-foreground);
@@ -988,7 +988,7 @@ body.theme-brutalist .warning-icon {
 }
 
 body.theme-brutalist .warning-title {
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: 'DM Sans', sans-serif;
     font-size: 1.125rem;
     font-weight: 700;
 }
@@ -1035,7 +1035,7 @@ body.theme-brutalist .info-details summary {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-family: 'Space Mono', monospace;
+    font-family: 'DM Mono', monospace;
     font-size: 0.875rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -1076,7 +1076,7 @@ body.theme-brutalist .info-section a {
     gap: 0.5rem;
     width: 100%;
     padding: 1rem 1.5rem;
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: 'DM Sans', sans-serif;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -1120,7 +1120,7 @@ body.theme-brutalist .theme-toggle {
     border: 2px solid var(--brutal-border);
     border-radius: var(--brutal-radius);
     padding: 0.5rem 0.75rem;
-    font-family: 'Space Mono', monospace;
+    font-family: 'DM Mono', monospace;
     font-weight: 700;
     font-size: 0.75rem;
     cursor: pointer;
