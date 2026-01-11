@@ -1,6 +1,6 @@
 // === KONFIGURASJON ===
 const CONFIG = {
-  DEBUG: false,
+  DEBUG: true, // Sett til false i produksjon
   CACHE_KEY: 'havet_arena_data',
   CACHE_DURATION: 1000 * 60 * 60, // 1 time
   CACHE_VERSION: 7, // v7: Sentry, forbedret feilhåndtering
@@ -33,12 +33,24 @@ const LON = 10.42506;
 let sentryLoaded = false;
 
 function initSentry() {
-  if (!CONFIG.SENTRY_DSN || sentryLoaded) return;
+  // eslint-disable-next-line no-console
+  console.log('[Sentry] Starter initialisering...', {
+    dsn: !!CONFIG.SENTRY_DSN,
+    loaded: sentryLoaded,
+  });
+
+  if (!CONFIG.SENTRY_DSN || sentryLoaded) {
+    // eslint-disable-next-line no-console
+    console.log('[Sentry] Avbryter - ingen DSN eller allerede lastet');
+    return;
+  }
 
   const script = document.createElement('script');
   script.src = 'https://browser.sentry-cdn.com/8.42.0/bundle.min.js';
   script.crossOrigin = 'anonymous';
   script.onload = () => {
+    // eslint-disable-next-line no-console
+    console.log('[Sentry] Script lastet, window.Sentry:', !!window.Sentry);
     if (window.Sentry) {
       window.Sentry.init({
         dsn: CONFIG.SENTRY_DSN,
@@ -46,21 +58,33 @@ function initSentry() {
         release: `havet-arena@${CONFIG.CACHE_VERSION}`,
         tracesSampleRate: 0.1,
         beforeSend(event) {
+          // eslint-disable-next-line no-console
+          console.log(
+            '[Sentry] beforeSend kalt, event type:',
+            event.exception ? 'exception' : 'other'
+          );
           // Ikke send events i development med mindre DEBUG er på
           if (window.location.hostname === 'localhost' && !CONFIG.DEBUG) {
+            // eslint-disable-next-line no-console
+            console.log('[Sentry] Event filtrert ut (localhost + DEBUG=false)');
             return null;
           }
           return event;
         },
       });
       sentryLoaded = true;
-      log('Sentry initialisert');
+      // eslint-disable-next-line no-console
+      console.log(
+        '[Sentry] Initialisert! Du kan nå teste med: window.Sentry.captureMessage("Test")'
+      );
     }
   };
-  script.onerror = () => {
-    log('Kunne ikke laste Sentry');
+  script.onerror = e => {
+    console.error('[Sentry] Feil ved lasting av script:', e);
   };
   document.head.appendChild(script);
+  // eslint-disable-next-line no-console
+  console.log('[Sentry] Script-element lagt til i <head>');
 }
 
 function captureError(error, context = {}) {
