@@ -1,5 +1,5 @@
 // Service Worker for Havet Arena
-const CACHE_NAME = 'havet-arena-v1';
+const CACHE_NAME = 'havet-arena-v2';
 const ASSETS_TO_CACHE = ['/', '/index.html', '/styles.css', '/app.js', '/manifest.json'];
 
 // Install - cache essential files
@@ -29,6 +29,20 @@ self.addEventListener('activate', event => {
 // Fetch - network first, fall back to cache
 self.addEventListener('fetch', event => {
   const { request } = event;
+
+  // Only handle GET requests - POST, etc. cannot be cached
+  if (request.method !== 'GET') {
+    return;
+  }
+
+  // Skip Sentry and other analytics/tracking requests
+  if (
+    request.url.includes('sentry') ||
+    request.url.includes('ingest.') ||
+    request.url.includes('analytics')
+  ) {
+    return;
+  }
 
   // For API requests (workers, open-meteo, etc.) - always try network first
   if (
