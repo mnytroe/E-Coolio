@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git clone:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run lint)",
+      "Bash(npm test)",
+      "Bash(python -m http.server:*)",
+      "Bash(timeout:*)",
+      "Bash(curl:*)",
+      "Bash(ping:*)",
+      "Bash(npx -y serve -p 8080)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(npx -y serve:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

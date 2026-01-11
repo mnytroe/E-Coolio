@@ -1,100 +1,172 @@
-export default {
-    async fetch(request, env, ctx) {
-      const DOC_ID = '1RjJTWQTPRwHtWC-fi1QnelKcpBXXB3eLw7Ld-beK2TE';
-      const url = new URL(request.url);
-      const debug = url.searchParams.get('debug') === 'true';
-  
-      // 1. SJEKK HER: Hvis brukeren går til /docs, vis dokumentasjonen
-      if (url.pathname === '/docs') {
-        return new Response(getDocumentationHtml(), {
-          headers: { "Content-Type": "text/html; charset=utf-8" }
-        });
-      }
-  
-      // 2. NY SJEKK: Hvis brukeren går til /ukens, vis den enkle HTML-siden
-      if (url.pathname === '/ukens') {
-        return new Response(getUkensHtml(), {
-          headers: { "Content-Type": "text/html; charset=utf-8" }
-        });
-      }
-      
-      // CORS Pre-flight
-      if (request.method === "OPTIONS") {
-        return new Response(null, {
-          headers: {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type",
-          },
-        });
-      }
-  
-      try {
-        // Hent HTML fra Google Docs
-        const htmlUrl = `https://docs.google.com/document/d/${DOC_ID}/export?format=html`;
-        const response = await fetch(htmlUrl, {
-          headers: {
-            "User-Agent": "BadevannAPI/1.0",
-            "Accept": "text/html"
-          }
-        });
-  
-        if (!response.ok) {
-          throw new Error(`Google Docs feilet: ${response.status}`);
-        }
-  
-        let html = await response.text();
-        const originalLength = html.length;
-  
-        // Klipp bort gamle data (behold kun gjeldende år)
-        const currentYear = new Date().getFullYear();
-        const cutoffMarkers = [];
-        
-        // Generer markører for tidligere år (5 år bakover)
-        for (let year = currentYear - 1; year >= currentYear - 5; year--) {
-          cutoffMarkers.push(`Resultater for ${year}`);
-          cutoffMarkers.push(`Resultater ${year}`);
-        }
-        
-        for (const marker of cutoffMarkers) {
-          const cutoffIndex = html.indexOf(marker);
-          if (cutoffIndex !== -1) {
-            html = html.slice(0, cutoffIndex);
-            break;
-          }
-        }
-  
-        // Parse tabellene
-        const result = parseHtmlToBacteriaData(html, debug);
-        result.lastUpdated = new Date().toISOString();
-        
-        if (debug) {
-          result._debug = {
-            originalHtmlLength: originalLength,
-            trimmedHtmlLength: html.length,
-            htmlSnippet: html.substring(0, 2000)
-          };
-        }
-  
-        return new Response(JSON.stringify(result, null, debug ? 2 : 0), {
-          headers: {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-            "Cache-Control": "public, max-age=3600"
-          },
-        });
-  
-      } catch (e) {
-        return new Response(JSON.stringify({ error: e.message, stack: e.stack }), { 
-          status: 500,
-          headers: { 
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*" 
-          } 
-        });
-      }
-    },
+// Konfigurasjonsvariabler
+const CONFIG = {
+  DOC_ID: '1RjJTWQTPRwHtWC-fi1QnelKcpBXXB3eLw7Ld-beK2TE',
+  // Tillatte domener for CORS (produksjon)
+  ALLOWED_ORIGINS: [
+    'https://havet.app',
+    'http://localhost:8080',
+    'http://localhost:8081',
+    'http://127.0.0.1:8080',
+    'http://127.0.0.1:8081',
+  ],
+  // Rate limiting: maks forespørsler per minutt per IP
+  RATE_LIMIT_PER_MINUTE: 60,
+  CACHE_TTL_SECONDS: 3600, // 1 time
+};
+
+// In-memory rate limiting (resettes ved worker restart)
+const rateLimitMap = new Map();
+
+function isRateLimited(ip) {
+  const now = Date.now();
+  const windowMs = 60 * 1000; // 1 minutt
+  const record = rateLimitMap.get(ip);
+
+  if (!record || now - record.windowStart > windowMs) {
+    rateLimitMap.set(ip, { windowStart: now, count: 1 });
+    return false;
+  }
+
+  record.count++;
+  if (record.count > CONFIG.RATE_LIMIT_PER_MINUTE) {
+    return true;
+  }
+  return false;
+}
+
+function getCorsHeaders(request) {
+  const origin = request.headers.get('Origin') || '';
+
+  // Sjekk om origin er tillatt
+  if (CONFIG.ALLOWED_ORIGINS.includes(origin)) {
+    return {
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      Vary: 'Origin',
+    };
+  }
+
+  // For requests uten Origin header (direkte API-kall), tillat alle
+  if (!origin) {
+    return {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    };
+  }
+
+  // Ukjent origin - returner begrenset respons
+  return {
+    'Access-Control-Allow-Origin': 'null',
+    'Access-Control-Allow-Methods': 'GET',
   };
+}
+
+export default {
+  async fetch(request, _env, _ctx) {
+    const url = new URL(request.url);
+    const debug = url.searchParams.get('debug') === 'true';
+
+    // Rate limiting
+    const clientIP = request.headers.get('CF-Connecting-IP') || 'unknown';
+    if (isRateLimited(clientIP)) {
+      return new Response(JSON.stringify({ error: 'Rate limit exceeded. Try again later.' }), {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          'Retry-After': '60',
+          ...getCorsHeaders(request),
+        },
+      });
+    }
+
+    // 1. SJEKK HER: Hvis brukeren går til /docs, vis dokumentasjonen
+    if (url.pathname === '/docs') {
+      return new Response(getDocumentationHtml(), {
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      });
+    }
+
+    // 2. NY SJEKK: Hvis brukeren går til /ukens, vis den enkle HTML-siden
+    if (url.pathname === '/ukens') {
+      return new Response(getUkensHtml(), {
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      });
+    }
+
+    // CORS Pre-flight
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        headers: getCorsHeaders(request),
+      });
+    }
+
+    try {
+      // Hent HTML fra Google Docs
+      const htmlUrl = `https://docs.google.com/document/d/${CONFIG.DOC_ID}/export?format=html`;
+      const response = await fetch(htmlUrl, {
+        headers: {
+          'User-Agent': 'BadevannAPI/1.0',
+          Accept: 'text/html',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Google Docs feilet: ${response.status}`);
+      }
+
+      let html = await response.text();
+      const originalLength = html.length;
+
+      // Klipp bort gamle data (behold kun gjeldende år)
+      const currentYear = new Date().getFullYear();
+      const cutoffMarkers = [];
+
+      // Generer markører for tidligere år (5 år bakover)
+      for (let year = currentYear - 1; year >= currentYear - 5; year--) {
+        cutoffMarkers.push(`Resultater for ${year}`);
+        cutoffMarkers.push(`Resultater ${year}`);
+      }
+
+      for (const marker of cutoffMarkers) {
+        const cutoffIndex = html.indexOf(marker);
+        if (cutoffIndex !== -1) {
+          html = html.slice(0, cutoffIndex);
+          break;
+        }
+      }
+
+      // Parse tabellene
+      const result = parseHtmlToBacteriaData(html, debug);
+      result.lastUpdated = new Date().toISOString();
+
+      if (debug) {
+        result._debug = {
+          originalHtmlLength: originalLength,
+          trimmedHtmlLength: html.length,
+          htmlSnippet: html.substring(0, 2000),
+        };
+      }
+
+      return new Response(JSON.stringify(result, null, debug ? 2 : 0), {
+        headers: {
+          'Content-Type': 'application/json',
+          ...getCorsHeaders(request),
+          'Cache-Control': `public, max-age=${CONFIG.CACHE_TTL_SECONDS}`,
+        },
+      });
+    } catch (e) {
+      return new Response(JSON.stringify({ error: e.message }), {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          ...getCorsHeaders(request),
+        },
+      });
+    }
+  },
+};
   
   function parseHtmlToBacteriaData(html, debug = false) {
     const result = {
@@ -123,13 +195,13 @@ export default {
         let cellMatch;
         
         while ((cellMatch = cellRegex.exec(rowHtml)) !== null) {
-          let cellText = cellMatch[1]
+          const cellText = cellMatch[1]
             .replace(/<[^>]+>/g, '')
             .replace(/&nbsp;/g, ' ')
             .replace(/&amp;/g, '&')
             .replace(/&lt;/g, '<')
             .replace(/&gt;/g, '>')
-            .replace(/&#(\d+);/g, (_, num) => String.fromCharCode(num))
+            .replace(/&#(\d+);/g, (_match, num) => String.fromCharCode(num))
             .trim();
           cells.push(cellText);
         }
