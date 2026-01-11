@@ -1,0 +1,36 @@
+<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0077b6"/>
+      <stop offset="100%" style="stop-color:#023e8a"/>
+    </linearGradient>
+    <linearGradient id="waveGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#90e0ef;stop-opacity:0.6"/>
+      <stop offset="100%" style="stop-color:#00b4d8;stop-opacity:0.3"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bgGradient)"/>
+
+  <!-- Decorative waves at bottom -->
+  <path d="M0,500 C150,470 300,530 450,500 C600,470 750,530 900,500 C1050,470 1200,530 1200,500 L1200,630 L0,630 Z" fill="url(#waveGradient)"/>
+  <path d="M0,540 C150,510 300,570 450,540 C600,510 750,570 900,540 C1050,510 1200,570 1200,540 L1200,630 L0,630 Z" fill="url(#waveGradient)" opacity="0.7"/>
+  <path d="M0,580 C150,550 300,610 450,580 C600,550 750,610 900,580 C1050,550 1200,610 1200,580 L1200,630 L0,630 Z" fill="url(#waveGradient)" opacity="0.5"/>
+
+  <!-- Wave icon -->
+  <g transform="translate(540, 180)" stroke="#90e0ef" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M0,20 C20,10 40,30 60,20 C80,10 100,30 120,20"/>
+    <path d="M0,50 C20,40 40,60 60,50 C80,40 100,60 120,50"/>
+    <path d="M0,80 C20,70 40,90 60,80 C80,70 100,90 120,80"/>
+  </g>
+
+  <!-- Main title -->
+  <text x="600" y="340" font-family="system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-size="72" font-weight="700" fill="white" text-anchor="middle">Havet Arena</text>
+
+  <!-- Subtitle -->
+  <text x="600" y="410" font-family="system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-size="32" font-weight="400" fill="#caf0f8" text-anchor="middle">Badevannskvalitet i Nyhavna, Trondheim</text>
+
+  <!-- Domain -->
+  <text x="600" y="470" font-family="system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-size="24" font-weight="500" fill="#90e0ef" text-anchor="middle">havet.app</text>
+</svg>
