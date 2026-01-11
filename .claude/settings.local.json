@@ -13,7 +13,10 @@
       "Bash(dir:*)",
       "Bash(findstr:*)",
       "Bash(npx -y serve:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)",
+      "Bash(npm run format:*)"
     ]
   }
 }

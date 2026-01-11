@@ -167,113 +167,116 @@ export default {
     }
   },
 };
-  
-  function parseHtmlToBacteriaData(html, debug = false) {
-    const result = {
-      weeks: {},
-      _tables: debug ? [] : undefined
-    };
-  
-    html = html.replace(/\r?\n/g, ' ').replace(/\s+/g, ' ');
-  
-    const tableRegex = /<table[^>]*>(.*?)<\/table>/gi;
-    let tableMatch;
-    let tableIndex = 0;
-    
-    while ((tableMatch = tableRegex.exec(html)) !== null) {
-      const tableHtml = tableMatch[1];
-      tableIndex++;
-      
-      const rows = [];
-      const rowRegex = /<tr[^>]*>(.*?)<\/tr>/gi;
-      let rowMatch;
-      
-      while ((rowMatch = rowRegex.exec(tableHtml)) !== null) {
-        const rowHtml = rowMatch[1];
-        const cells = [];
-        const cellRegex = /<t[dh][^>]*>(.*?)<\/t[dh]>/gi;
-        let cellMatch;
-        
-        while ((cellMatch = cellRegex.exec(rowHtml)) !== null) {
-          const cellText = cellMatch[1]
-            .replace(/<[^>]+>/g, '')
-            .replace(/&nbsp;/g, ' ')
-            .replace(/&amp;/g, '&')
-            .replace(/&lt;/g, '<')
-            .replace(/&gt;/g, '>')
-            .replace(/&#(\d+);/g, (_match, num) => String.fromCharCode(num))
-            .trim();
-          cells.push(cellText);
-        }
-        
-        if (cells.length > 0) {
-          rows.push(cells);
-        }
+
+function parseHtmlToBacteriaData(html, debug = false) {
+  const result = {
+    weeks: {},
+    _tables: debug ? [] : undefined,
+  };
+
+  html = html.replace(/\r?\n/g, ' ').replace(/\s+/g, ' ');
+
+  const tableRegex = /<table[^>]*>(.*?)<\/table>/gi;
+  let tableMatch;
+  let tableIndex = 0;
+
+  while ((tableMatch = tableRegex.exec(html)) !== null) {
+    const tableHtml = tableMatch[1];
+    tableIndex++;
+
+    const rows = [];
+    const rowRegex = /<tr[^>]*>(.*?)<\/tr>/gi;
+    let rowMatch;
+
+    while ((rowMatch = rowRegex.exec(tableHtml)) !== null) {
+      const rowHtml = rowMatch[1];
+      const cells = [];
+      const cellRegex = /<t[dh][^>]*>(.*?)<\/t[dh]>/gi;
+      let cellMatch;
+
+      while ((cellMatch = cellRegex.exec(rowHtml)) !== null) {
+        const cellText = cellMatch[1]
+          .replace(/<[^>]+>/g, '')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&#(\d+);/g, (_match, num) => String.fromCharCode(num))
+          .trim();
+        cells.push(cellText);
       }
-      
-      if (debug && rows.length > 0) {
-        result._tables.push({
-          index: tableIndex,
-          rowCount: rows.length,
-          firstRow: rows[0]?.slice(0, 5),
-          secondRow: rows[1]?.slice(0, 5)
-        });
+
+      if (cells.length > 0) {
+        rows.push(cells);
       }
-      
-      let headerRowIndex = -1;
-      let havetArenaRowIndex = -1;
-      
-      for (let i = 0; i < rows.length; i++) {
-        const firstCell = (rows[i][0] || '').toLowerCase();
-        if (firstCell.includes('pr') && (firstCell.includes('vepunkt') || firstCell.includes('øvepunkt'))) {
-          headerRowIndex = i;
-        }
-        if (firstCell.includes('havet') && firstCell.includes('arena')) {
-          havetArenaRowIndex = i;
-        }
+    }
+
+    if (debug && rows.length > 0) {
+      result._tables.push({
+        index: tableIndex,
+        rowCount: rows.length,
+        firstRow: rows[0]?.slice(0, 5),
+        secondRow: rows[1]?.slice(0, 5),
+      });
+    }
+
+    let headerRowIndex = -1;
+    let havetArenaRowIndex = -1;
+
+    for (let i = 0; i < rows.length; i++) {
+      const firstCell = (rows[i][0] || '').toLowerCase();
+      if (
+        firstCell.includes('pr') &&
+        (firstCell.includes('vepunkt') || firstCell.includes('øvepunkt'))
+      ) {
+        headerRowIndex = i;
       }
-      
-      if (headerRowIndex !== -1 && havetArenaRowIndex !== -1) {
-        const headerRow = rows[headerRowIndex];
-        const havetArenaRow = rows[havetArenaRowIndex];
-        
-        for (let i = 1; i < headerRow.length; i++) {
-          const headerCell = headerRow[i].toLowerCase();
-          const weekMatch = headerCell.match(/uke\s*(\d+)/i) || headerCell.match(/^(\d+)$/);
-          
-          if (weekMatch) {
-            const weekNum = parseInt(weekMatch[1], 10);
-            const value = havetArenaRow[i] || '';
-            
-            if (value && value !== '-' && value.trim() !== '') {
-              result.weeks[weekNum] = {
-                raw: value,
-                value: parseValue(value)
-              };
-            }
+      if (firstCell.includes('havet') && firstCell.includes('arena')) {
+        havetArenaRowIndex = i;
+      }
+    }
+
+    if (headerRowIndex !== -1 && havetArenaRowIndex !== -1) {
+      const headerRow = rows[headerRowIndex];
+      const havetArenaRow = rows[havetArenaRowIndex];
+
+      for (let i = 1; i < headerRow.length; i++) {
+        const headerCell = headerRow[i].toLowerCase();
+        const weekMatch = headerCell.match(/uke\s*(\d+)/i) || headerCell.match(/^(\d+)$/);
+
+        if (weekMatch) {
+          const weekNum = parseInt(weekMatch[1], 10);
+          const value = havetArenaRow[i] || '';
+
+          if (value && value !== '-' && value.trim() !== '') {
+            result.weeks[weekNum] = {
+              raw: value,
+              value: parseValue(value),
+            };
           }
         }
       }
     }
-    
-    return result;
   }
-  
-  function parseValue(str) {
-    if (!str) return null;
-    const isEstimate = str.includes('>') || str.includes('<');
-    const cleaned = str.replace(/[^0-9.,]/g, '').replace(',', '.');
-    const num = parseFloat(cleaned);
-    
-    return {
-      number: isNaN(num) ? null : num,
-      isEstimate: isEstimate
-    };
-  }
-  
-  // HTML for /ukens
-  function getUkensHtml() {
-    return `<!DOCTYPE html>
+
+  return result;
+}
+
+function parseValue(str) {
+  if (!str) return null;
+  const isEstimate = str.includes('>') || str.includes('<');
+  const cleaned = str.replace(/[^0-9.,]/g, '').replace(',', '.');
+  const num = parseFloat(cleaned);
+
+  return {
+    number: isNaN(num) ? null : num,
+    isEstimate: isEstimate,
+  };
+}
+
+// HTML for /ukens
+function getUkensHtml() {
+  return `<!DOCTYPE html>
   <html lang="no">
   <head>
       <meta charset="UTF-8">
@@ -293,11 +296,11 @@ export default {
       </script>
   </body>
   </html>`;
-  }
-  
-  // HTML-dokumentasjon som vises på /docs
-  function getDocumentationHtml() {
-    return `
+}
+
+// HTML-dokumentasjon som vises på /docs
+function getDocumentationHtml() {
+  return `
     <!DOCTYPE html>
     <html lang="no">
     <head>
@@ -368,4 +371,4 @@ export default {
     </body>
     </html>
     `;
-  }
+}

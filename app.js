@@ -17,7 +17,8 @@ const CONFIG = {
     OPEN_METEO: 'https://api.open-meteo.com/v1/forecast',
   },
   // Sentry konfigurasjon - sett din egen DSN her
-  SENTRY_DSN: 'https://0bc32267eafbb1fb9b68fcfaeb23d2a0@o4510692242292736.ingest.de.sentry.io/4510692677386320'
+  SENTRY_DSN:
+    'https://0bc32267eafbb1fb9b68fcfaeb23d2a0@o4510692242292736.ingest.de.sentry.io/4510692677386320',
 };
 
 let CURRENT_REQUEST_ID = 0;
@@ -589,8 +590,13 @@ function toggleTheme() {
   }
 }
 
-// Eksponer globalt for HTML onclick
-window.toggleTheme = toggleTheme;
+// Legg til click handler for tema-toggle
+function initThemeToggle() {
+  const toggle = document.getElementById('themeToggle');
+  if (toggle) {
+    toggle.addEventListener('click', toggleTheme);
+  }
+}
 
 function renderChart(history) {
   const historyContainer = document.getElementById('historyChart');
@@ -788,8 +794,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Initialiser Sentry først (hvis konfigurert)
   initSentry();
 
-  // Initialiser tema
+  // Initialiser tema og toggle-knapp
   initTheme();
+  initThemeToggle();
 
   // Registrer Service Worker
   registerServiceWorker();
@@ -828,4 +835,3 @@ if (typeof module !== 'undefined' && module.exports) {
     CONFIG,
   };
 }
-
