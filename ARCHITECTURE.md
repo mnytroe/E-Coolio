@@ -90,12 +90,25 @@ Bakteriedata:
 /
 ├── index.html      # HTML-struktur
 ├── styles.css      # All CSS (inkl. dark mode, responsive)
-├── app.js          # All JavaScript
+├── app.js          # DOM, nettverk og UI (ES-modul)
+├── utils.js        # Ren logikk delt mellom app.js, worker.js og testene
+├── worker.js       # Cloudflare Worker for bakteriedata
+├── wrangler.toml   # Worker-deploy (npm run deploy:worker)
 ├── manifest.json   # PWA manifest
 ├── sw.js           # Service Worker for offline
+├── tests/          # Vitest, kjører mot utils.js og worker.js direkte
 ├── ARCHITECTURE.md # Denne filen
 └── README.md       # Kort beskrivelse
 ```
+
+**`utils.js`** er eneste kilde for grenseverdier (`THRESHOLDS`), ukenummer-
+logikk og parsing. Både frontend og workeren importerer derfra, slik at de ikke
+kan komme i utakt. Modulen er DOM-uavhengig og kjører derfor like godt i
+nettleseren, i Workers-runtime og i vitest.
+
+**Deploy av workeren** skjer med `npm run deploy:worker` (wrangler). Den kan
+ikke lenger limes inn som én fil i Cloudflare-dashboardet, siden den importerer
+fra `utils.js`.
 
 ---
 

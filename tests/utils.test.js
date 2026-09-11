@@ -1,58 +1,5 @@
 import { describe, it, expect } from 'vitest';
-
-// Re-implementer funksjonene for testing (siden app.js ikke er en modul)
-function getWeekNumber(date) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNum = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
-  return { week: weekNum, year: d.getUTCFullYear() };
-}
-
-function parseHavvarselJson(data) {
-  if (!data) return null;
-
-  if (data.variables && Array.isArray(data.variables) && data.variables.length > 0) {
-    const variable = data.variables[0];
-    if (variable.data && Array.isArray(variable.data) && variable.data.length > 0) {
-      return variable.data[0]?.value;
-    }
-    if (variable.value !== undefined) return variable.value;
-  }
-
-  const pointData = data.queryPoint || data.closestGridPoint || data.closestGridPointWithData;
-  if (pointData) {
-    if (pointData.temperature !== undefined) return pointData.temperature;
-    if (Array.isArray(pointData.values) && pointData.values.length > 0) {
-      return pointData.values[0];
-    }
-  }
-
-  const flatCandidates = [
-    data.temperature,
-    data.temp,
-    data.value,
-    data.current?.temperature,
-    data.current?.temp,
-    data.data && (data.data.temperature || data.data.temp || data.data.value),
-    Array.isArray(data) && data[0]?.temperature,
-  ];
-
-  return flatCandidates.find(val => val !== undefined && val !== null) ?? null;
-}
-
-function parseValue(str) {
-  if (!str) return null;
-  const isEstimate = str.includes('>') || str.includes('<');
-  const cleaned = str.replace(/[^0-9.,]/g, '').replace(',', '.');
-  const num = parseFloat(cleaned);
-
-  return {
-    number: isNaN(num) ? null : num,
-    isEstimate: isEstimate,
-  };
-}
+import { getWeekNumber, parseHavvarselJson, parseValue, weekOrdinal } from '../utils.js';
 
 describe('getWeekNumber', () => {
   it('should return correct week for January 1st', () => {
@@ -81,6 +28,16 @@ describe('getWeekNumber', () => {
   });
 });
 
+describe('weekOrdinal', () => {
+  it('sorterer uke 1 i nytt år etter uke 52 i fjor', () => {
+    expect(weekOrdinal(2025, 52)).toBeLessThan(weekOrdinal(2026, 1));
+  });
+
+  it('bevarer rekkefølgen innenfor samme år', () => {
+    expect(weekOrdinal(2025, 9)).toBeLessThan(weekOrdinal(2025, 10));
+  });
+});
+
 describe('parseHavvarselJson', () => {
   it('should return null for null input', () => {
     expect(parseHavvarselJson(null)).toBe(null);
@@ -91,6 +48,13 @@ describe('parseHavvarselJson', () => {
       variables: [{ data: [{ value: 8.5 }] }],
     };
     expect(parseHavvarselJson(data)).toBe(8.5);
+  });
+
+  it('should parse variables entry without data array', () => {
+    const data = {
+      variables: [{ value: 7.2 }],
+    };
+    expect(parseHavvarselJson(data)).toBe(7.2);
   });
 
   it('should parse queryPoint format', () => {

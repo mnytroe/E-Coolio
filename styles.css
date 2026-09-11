@@ -887,7 +887,8 @@ body.theme-brutalist .bar {
   width: 100%;
   border: 2px solid var(--brutal-border);
   transition: height 0.3s ease;
-  background-color: var(--brutal-secondary);
+  /* Matcher status-badgen for "God" slik at legenden stemmer med fargen */
+  background-color: var(--brutal-success);
   border-radius: 0;
 }
 
@@ -930,7 +931,7 @@ body.theme-brutalist .legend-color {
 }
 
 body.theme-brutalist .legend-color.safe {
-  background-color: var(--brutal-secondary);
+  background-color: var(--brutal-success);
 }
 
 body.theme-brutalist .legend-color.caution {

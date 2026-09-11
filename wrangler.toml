@@ -1,0 +1,7 @@
+name = "bakterier"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+# worker.js importerer fra utils.js, som deles med frontend. Wrangler bundler
+# dem sammen ved deploy - derfor kan denne workeren ikke lenger deployes ved å
+# lime inn én fil i Cloudflare-dashboardet. Bruk `npm run deploy:worker`.

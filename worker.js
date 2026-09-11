@@ -1,3 +1,5 @@
+import { parseValue } from './utils.js';
+
 // Konfigurasjonsvariabler
 const CONFIG = {
   DOC_ID: '1RjJTWQTPRwHtWC-fi1QnelKcpBXXB3eLw7Ld-beK2TE',
@@ -165,7 +167,7 @@ export default {
  * årets tall ennå, gir det riktig årstall likevel: er første markør 2024,
  * er innledningen 2025 – ikke "inneværende år".
  */
-function splitByYear(html, currentYear) {
+export function splitByYear(html, currentYear) {
   const markerRegex = /Resultater\s+(?:for\s+)?(\d{4})/g;
   const markers = [];
   let match;
@@ -194,7 +196,7 @@ function splitByYear(html, currentYear) {
  *  - `weeks`:  kun inneværende år, i det gamle formatet (bakoverkompatibelt
  *              for klienter som ikke er oppdatert ennå)
  */
-function parseSegments(segments, debug = false) {
+export function parseSegments(segments, debug = false) {
   const series = [];
   const tables = debug ? [] : undefined;
 
@@ -321,18 +323,6 @@ function parseHtmlToBacteriaData(html, debug = false) {
   }
 
   return result;
-}
-
-function parseValue(str) {
-  if (!str) return null;
-  const isEstimate = str.includes('>') || str.includes('<');
-  const cleaned = str.replace(/[^0-9.,]/g, '').replace(',', '.');
-  const num = parseFloat(cleaned);
-
-  return {
-    number: isNaN(num) ? null : num,
-    isEstimate: isEstimate,
-  };
 }
 
 // HTML for /ukens

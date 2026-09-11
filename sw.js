@@ -1,6 +1,13 @@
 // Service Worker for Havet Arena
-const CACHE_NAME = 'havet-arena-v3';
-const ASSETS_TO_CACHE = ['/', '/index.html', '/styles.css', '/app.js', '/manifest.json'];
+const CACHE_NAME = 'havet-arena-v4';
+const ASSETS_TO_CACHE = [
+  '/',
+  '/index.html',
+  '/styles.css',
+  '/app.js',
+  '/utils.js',
+  '/manifest.json',
+];
 
 // Install - cache essential files
 self.addEventListener('install', event => {

@@ -1,45 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import fs from 'node:fs';
-import path from 'node:path';
-
-/**
- * Disse testene kjører mot den faktiske koden i app.js og worker.js, ikke mot
- * kopier. app.js er ennå ikke en ES-modul, så den lastes med `new Function` og
- * et minimalt DOM-stub. Når app.js splittes i moduler kan dette byttes ut med
- * vanlig `import`.
- */
-function loadApp() {
-  const src = fs.readFileSync(path.resolve('app.js'), 'utf8');
-  const stub = `
-    globalThis.document = {
-      addEventListener() {},
-      getElementById() { return null; },
-      createElement() {
-        return {
-          getContext() { return null; },
-          style: {}, dataset: {},
-          appendChild() {},
-          classList: { add() {} },
-        };
-      },
-      head: { appendChild() {} },
-    };
-    globalThis.window = { location: { hostname: 'test' } };
-    globalThis.localStorage = { getItem() { return null; }, setItem() {} };
-    globalThis.navigator = {};
-  `;
-  return new Function(
-    `${stub}${src}\nreturn { processWorkerData, classifyValue, formatWeekLabel, CONFIG };`
-  )();
-}
-
-function loadWorker() {
-  // Fjern `export default { ... }` så fila kan evalueres utenfor Workers-runtime
-  const src = fs
-    .readFileSync(path.resolve('worker.js'), 'utf8')
-    .replace(/export default \{[\s\S]*?\n\};\n/, '');
-  return new Function(`${src}\nreturn { splitByYear, parseSegments };`)();
-}
+import { classifyValue, formatWeekLabel, processWorkerData, THRESHOLDS } from '../utils.js';
+import { splitByYear, parseSegments } from '../worker.js';
 
 /** Kjører fn med systemklokka låst til et gitt tidspunkt. */
 function at(iso, fn) {
@@ -59,9 +20,6 @@ function at(iso, fn) {
   }
 }
 
-const app = loadApp();
-const worker = loadWorker();
-
 describe('classifyValue – Helsedirektoratets vannkvalitetsnormer', () => {
   it.each([
     [0, 'green'],
@@ -73,17 +31,17 @@ describe('classifyValue – Helsedirektoratets vannkvalitetsnormer', () => {
     [1000, 'red'],
     [5000, 'red'],
   ])('%i CFU/100 ml gir nivå %s', (value, level) => {
-    expect(app.classifyValue(value).level).toBe(level);
+    expect(classifyValue(value).level).toBe(level);
   });
 
   it('nevner oppfølgingsprøve fra og med kommunens 500-grense', () => {
-    expect(app.classifyValue(500).label).toContain('oppfølgingsprøve');
-    expect(app.classifyValue(499).label).not.toContain('oppfølgingsprøve');
+    expect(classifyValue(500).label).toContain('oppfølgingsprøve');
+    expect(classifyValue(499).label).not.toContain('oppfølgingsprøve');
   });
 
   it('holder grenseverdiene i CONFIG konsistente', () => {
-    expect(app.CONFIG.THRESHOLD_GOOD).toBeLessThan(app.CONFIG.THRESHOLD_FOLLOWUP);
-    expect(app.CONFIG.THRESHOLD_FOLLOWUP).toBeLessThan(app.CONFIG.THRESHOLD_HIGH);
+    expect(THRESHOLDS.GOOD).toBeLessThan(THRESHOLDS.FOLLOWUP);
+    expect(THRESHOLDS.FOLLOWUP).toBeLessThan(THRESHOLDS.HIGH);
   });
 });
 
@@ -96,7 +54,7 @@ describe('processWorkerData – uke-oppslag over årsskiftet', () => {
   ];
 
   it('faller tilbake til forrige år når året er nytt og data mangler', () => {
-    const result = at('2026-01-05T12:00:00Z', () => app.processWorkerData({ series }));
+    const result = at('2026-01-05T12:00:00Z', () => processWorkerData({ series }));
 
     expect(result.actualWeek).toBe(52);
     expect(result.actualYear).toBe(2025);
@@ -105,7 +63,7 @@ describe('processWorkerData – uke-oppslag over årsskiftet', () => {
   });
 
   it('bygger historikk på tvers av årsskiftet', () => {
-    const result = at('2026-01-05T12:00:00Z', () => app.processWorkerData({ series }));
+    const result = at('2026-01-05T12:00:00Z', () => processWorkerData({ series }));
 
     expect(result.history.map(h => `${h.year}w${h.week}`)).toEqual([
       '2025w50',
@@ -115,26 +73,26 @@ describe('processWorkerData – uke-oppslag over årsskiftet', () => {
   });
 
   it('foretrekker eksakt treff på inneværende uke og år', () => {
-    const result = at('2026-01-14T12:00:00Z', () => app.processWorkerData({ series }));
+    const result = at('2026-01-14T12:00:00Z', () => processWorkerData({ series }));
 
     expect([result.actualWeek, result.actualYear, result.value]).toEqual([3, 2026, 55]);
   });
 
   it('godtar gammelt worker-format uten årstall', () => {
     const weeks = { 50: series[0], 51: series[1], 52: series[2] };
-    const result = at('2025-12-23T12:00:00Z', () => app.processWorkerData({ weeks }));
+    const result = at('2025-12-23T12:00:00Z', () => processWorkerData({ weeks }));
 
     expect([result.actualWeek, result.actualYear, result.value]).toEqual([52, 2025, 640]);
   });
 
   it('bruker nærmeste fremtidige måling når ingen tidligere finnes', () => {
-    const result = at('2026-01-05T12:00:00Z', () => app.processWorkerData({ series: [series[3]] }));
+    const result = at('2026-01-05T12:00:00Z', () => processWorkerData({ series: [series[3]] }));
 
     expect([result.actualWeek, result.actualYear]).toEqual([3, 2026]);
   });
 
   it('returnerer en tydelig feil for tomt datasett i stedet for å krasje', () => {
-    const result = at('2026-01-05T12:00:00Z', () => app.processWorkerData({ series: [] }));
+    const result = at('2026-01-05T12:00:00Z', () => processWorkerData({ series: [] }));
 
     expect(result.value).toBeNull();
     expect(result.error).toBeTruthy();
@@ -143,13 +101,13 @@ describe('processWorkerData – uke-oppslag over årsskiftet', () => {
 
 describe('formatWeekLabel', () => {
   it('utelater årstall for inneværende år', () => {
-    expect(at('2026-01-14T12:00:00Z', () => app.formatWeekLabel({ week: 3, year: 2026 }))).toBe(
+    expect(at('2026-01-14T12:00:00Z', () => formatWeekLabel({ week: 3, year: 2026 }))).toBe(
       'Uke 3'
     );
   });
 
   it('viser årstall når målingen er fra et annet år', () => {
-    expect(at('2026-01-05T12:00:00Z', () => app.formatWeekLabel({ week: 52, year: 2025 }))).toBe(
+    expect(at('2026-01-05T12:00:00Z', () => formatWeekLabel({ week: 52, year: 2025 }))).toBe(
       'Uke 52 · 2025'
     );
   });
@@ -166,27 +124,26 @@ describe('worker: splitByYear / parseSegments', () => {
     `<h2>Resultater for 2025</h2>${table([51, 52], ['120', '640'])}` +
     `<h2>Resultater for 2024</h2>${table([30], ['88'])}`;
 
-  const parseDoc = () =>
-    worker.parseSegments(worker.splitByYear(doc, 2026).filter(s => s.year >= 2025));
+  const parseDoc = () => parseSegments(splitByYear(doc, 2026).filter(s => s.year >= 2025));
 
   it('gir hvert segment riktig årstall', () => {
-    expect(worker.splitByYear(doc, 2026).map(s => s.year)).toEqual([2026, 2025, 2024]);
+    expect(splitByYear(doc, 2026).map(s => s.year)).toEqual([2026, 2025, 2024]);
   });
 
   it('utleder året fra markøren når dokumentet ikke er oppdatert ennå', () => {
     const stale = `${table([40], ['70'])}<h2>Resultater for 2024</h2>${table([30], ['88'])}`;
 
-    expect(worker.splitByYear(stale, 2026).map(s => s.year)).toEqual([2025, 2024]);
+    expect(splitByYear(stale, 2026).map(s => s.year)).toEqual([2025, 2024]);
   });
 
   it('antar inneværende år når dokumentet ikke har årsmarkører', () => {
-    expect(worker.splitByYear(table([40], ['70']), 2026).map(s => s.year)).toEqual([2026]);
+    expect(splitByYear(table([40], ['70']), 2026).map(s => s.year)).toEqual([2026]);
   });
 
   it('godtar «Resultater 2025» uten «for»', () => {
     const html = `${table([1], ['5'])}<h2>Resultater 2025</h2>`;
 
-    expect(worker.splitByYear(html, 2026).map(s => s.year)).toEqual([2026, 2025]);
+    expect(splitByYear(html, 2026).map(s => s.year)).toEqual([2026, 2025]);
   });
 
   it('slår sammen segmenter til en kronologisk serie', () => {
