@@ -129,7 +129,7 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
     return await fetch(url, { ...options, signal: controller.signal });
   } catch (err) {
     if (err.name === 'AbortError') {
-      throw new Error(`Tidsavbrudd etter ${timeoutMs / 1000}s mot ${url}`);
+      throw new Error(`Tidsavbrudd etter ${timeoutMs / 1000}s mot ${url}`, { cause: err });
     }
     throw err;
   } finally {
@@ -556,25 +556,16 @@ function updateUI(result) {
   loading.style.display = 'none';
   error.style.display = 'none';
 
-  let value = null;
-  let errorMessage = null;
-  let actualWeek = null;
-  let actualYear = null;
-  let isEstimate = false;
-  let rawValue = null;
-  let history = null;
-
-  if (typeof result === 'object' && result !== null) {
-    value = result.value;
-    errorMessage = result.error;
-    actualWeek = result.actualWeek;
-    actualYear = result.actualYear;
-    isEstimate = result.isEstimate;
-    rawValue = result.rawValue;
-    history = result.history;
-  } else {
-    value = result;
-  }
+  // updateUI tåler både et resultatobjekt og en naken verdi
+  const {
+    value = null,
+    error: errorMessage = null,
+    actualWeek = null,
+    actualYear = null,
+    isEstimate = false,
+    rawValue = null,
+    history = null,
+  } = typeof result === 'object' && result !== null ? result : { value: result };
 
   if (value === null || isNaN(value)) {
     error.style.display = 'block';
