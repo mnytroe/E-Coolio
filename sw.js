@@ -1,5 +1,5 @@
 // Service Worker for Havet Arena
-const CACHE_NAME = 'havet-arena-v2';
+const CACHE_NAME = 'havet-arena-v3';
 const ASSETS_TO_CACHE = ['/', '/index.html', '/styles.css', '/app.js', '/manifest.json'];
 
 // Install - cache essential files

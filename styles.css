@@ -90,6 +90,11 @@ h1 {
   color: white;
 }
 
+.value-display.yellow {
+  background: linear-gradient(135deg, #e08e0b 0%, #f5c542 100%);
+  color: #3d2c00;
+}
+
 .value-display.red {
   background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
   color: white;
@@ -107,6 +112,10 @@ h1 {
 
 .status-text.green {
   color: #27ae60;
+}
+
+.status-text.yellow {
+  color: #a05e03;
 }
 
 .status-text.red {
@@ -444,6 +453,11 @@ h1 {
   .info-section a {
     color: #00b4d8;
   }
+
+  /* Gul status trenger lysere tone for lesbarhet mot mørk bakgrunn */
+  .status-text.yellow {
+    color: #f0a92e;
+  }
 }
 
 /* === BRUTALIST HEADER (skjult i standard tema) === */
@@ -719,6 +733,7 @@ body.theme-brutalist .value-display {
 }
 
 body.theme-brutalist .value-display.green,
+body.theme-brutalist .value-display.yellow,
 body.theme-brutalist .value-display.red {
   background: transparent;
   color: var(--brutal-foreground);
@@ -748,10 +763,14 @@ body.theme-brutalist .status-text {
   }
 }
 
-body.theme-brutalist .status-text.warning,
 body.theme-brutalist .status-text.red {
   background-color: var(--brutal-destructive);
   color: var(--brutal-destructive-foreground);
+}
+
+body.theme-brutalist .status-text.yellow {
+  background-color: var(--brutal-warning);
+  color: var(--brutal-warning-foreground);
 }
 
 body.theme-brutalist .status-text.green {
@@ -872,8 +891,12 @@ body.theme-brutalist .bar {
   border-radius: 0;
 }
 
-body.theme-brutalist .bar.warning {
+body.theme-brutalist .bar.caution {
   background-color: var(--brutal-warning);
+}
+
+body.theme-brutalist .bar.warning {
+  background-color: var(--brutal-destructive);
 }
 
 body.theme-brutalist .bar-label {
@@ -910,8 +933,12 @@ body.theme-brutalist .legend-color.safe {
   background-color: var(--brutal-secondary);
 }
 
-body.theme-brutalist .legend-color.warning {
+body.theme-brutalist .legend-color.caution {
   background-color: var(--brutal-warning);
+}
+
+body.theme-brutalist .legend-color.warning {
+  background-color: var(--brutal-destructive);
 }
 
 body.theme-brutalist .loading {

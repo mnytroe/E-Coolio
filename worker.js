@@ -116,35 +116,23 @@ export default {
         throw new Error(`Google Docs feilet: ${response.status}`);
       }
 
-      let html = await response.text();
+      const html = await response.text();
       const originalLength = html.length;
 
-      // Klipp bort gamle data (behold kun gjeldende år)
+      // Del dokumentet i årssegmenter og behold inneværende + forrige år.
+      // Forrige år trengs for at uke 1-3 i januar skal kunne falle tilbake
+      // til uke 51/52 i fjor.
       const currentYear = new Date().getFullYear();
-      const cutoffMarkers = [];
+      const segments = splitByYear(html, currentYear).filter(seg => seg.year >= currentYear - 1);
 
-      // Generer markører for tidligere år (5 år bakover)
-      for (let year = currentYear - 1; year >= currentYear - 5; year--) {
-        cutoffMarkers.push(`Resultater for ${year}`);
-        cutoffMarkers.push(`Resultater ${year}`);
-      }
-
-      for (const marker of cutoffMarkers) {
-        const cutoffIndex = html.indexOf(marker);
-        if (cutoffIndex !== -1) {
-          html = html.slice(0, cutoffIndex);
-          break;
-        }
-      }
-
-      // Parse tabellene
-      const result = parseHtmlToBacteriaData(html, debug);
+      // Parse tabellene per årssegment
+      const result = parseSegments(segments, debug);
       result.lastUpdated = new Date().toISOString();
 
       if (debug) {
         result._debug = {
           originalHtmlLength: originalLength,
-          trimmedHtmlLength: html.length,
+          segments: segments.map(seg => ({ year: seg.year, length: seg.html.length })),
           htmlSnippet: html.substring(0, 2000),
         };
       }
@@ -167,6 +155,79 @@ export default {
     }
   },
 };
+
+/**
+ * Deler dokumentet i segmenter per år basert på overskrifter av typen
+ * "Resultater for 2025" / "Resultater 2025".
+ *
+ * Dokumentet er sortert nyest først, så teksten FØR den første markøren hører
+ * til året etter den første markøren. Hvis dokumentet ikke er oppdatert med
+ * årets tall ennå, gir det riktig årstall likevel: er første markør 2024,
+ * er innledningen 2025 – ikke "inneværende år".
+ */
+function splitByYear(html, currentYear) {
+  const markerRegex = /Resultater\s+(?:for\s+)?(\d{4})/g;
+  const markers = [];
+  let match;
+
+  while ((match = markerRegex.exec(html)) !== null) {
+    markers.push({ year: parseInt(match[1], 10), index: match.index });
+  }
+
+  if (markers.length === 0) {
+    return [{ year: currentYear, html }];
+  }
+
+  const segments = [{ year: markers[0].year + 1, html: html.slice(0, markers[0].index) }];
+
+  for (let i = 0; i < markers.length; i++) {
+    const end = i + 1 < markers.length ? markers[i + 1].index : html.length;
+    segments.push({ year: markers[i].year, html: html.slice(markers[i].index, end) });
+  }
+
+  return segments;
+}
+
+/**
+ * Parser hvert årssegment og slår resultatene sammen til:
+ *  - `series`: alle målinger med eksplisitt år (autoritativ kilde)
+ *  - `weeks`:  kun inneværende år, i det gamle formatet (bakoverkompatibelt
+ *              for klienter som ikke er oppdatert ennå)
+ */
+function parseSegments(segments, debug = false) {
+  const series = [];
+  const tables = debug ? [] : undefined;
+
+  for (const segment of segments) {
+    const parsed = parseHtmlToBacteriaData(segment.html, debug);
+
+    for (const [week, entry] of Object.entries(parsed.weeks)) {
+      series.push({
+        year: segment.year,
+        week: parseInt(week, 10),
+        raw: entry.raw,
+        value: entry.value,
+      });
+    }
+
+    if (debug && parsed._tables) {
+      tables.push(...parsed._tables.map(t => ({ ...t, year: segment.year })));
+    }
+  }
+
+  series.sort((a, b) => a.year - b.year || a.week - b.week);
+
+  // Bakoverkompatibelt `weeks`-objekt: nyeste år som finnes i dokumentet.
+  const latestYear = series.length > 0 ? series[series.length - 1].year : null;
+  const weeks = {};
+  for (const entry of series) {
+    if (entry.year === latestYear) {
+      weeks[entry.week] = { raw: entry.raw, value: entry.value };
+    }
+  }
+
+  return { series, weeks, _tables: tables };
+}
 
 function parseHtmlToBacteriaData(html, debug = false) {
   const result = {

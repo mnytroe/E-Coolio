@@ -3,8 +3,16 @@ const CONFIG = {
   DEBUG: false,
   CACHE_KEY: 'havet_arena_data',
   CACHE_DURATION: 1000 * 60 * 60, // 1 time
-  CACHE_VERSION: 7, // v7: Sentry, forbedret feilhåndtering
-  THRESHOLD_HIGH: 1000, // CFU/100ml - EU badevanndirektiv grense
+  CACHE_VERSION: 8, // v8: årstall i datasettet, tredelt grenseverdi
+  // Grenseverdier for E. coli (CFU/100 ml).
+  // Kilde: Helsedirektoratets vannkvalitetsnormer for friluftsbad.
+  //   < 100  -> God
+  //   100-999 -> Mindre god
+  //   >= 1000 -> Ikke akseptabel
+  THRESHOLD_GOOD: 100,
+  THRESHOLD_HIGH: 1000,
+  // Trondheim kommunes grense for å ta oppfølgingsprøve (vises som merknad).
+  THRESHOLD_FOLLOWUP: 500,
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000,
   THEME_KEY: 'havet_arena_theme',
@@ -148,6 +156,61 @@ function getWeekNumber(date) {
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
   const weekNum = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
   return { week: weekNum, year: d.getUTCFullYear() };
+}
+
+// Sammenlignbart løpenummer for (år, uke) slik at uker kan sorteres på tvers av årsskiftet.
+function weekOrdinal(year, week) {
+  return year * 100 + week;
+}
+
+// Kort ukelabel til grafene. Årstall vises kun når målingen er fra et annet år
+// enn inneværende, slik at januar-fallback til fjoråret ikke blir forvirrende.
+function formatWeekLabel({ week, year }) {
+  const currentYear = getWeekNumber(new Date()).year;
+  return year && year !== currentYear ? `Uke ${week} · ${year}` : `Uke ${week}`;
+}
+
+// === GRENSEVERDIER ===
+
+// SVG-paths for statusikonene
+const ICON_PATHS = {
+  success:
+    'M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z',
+  caution:
+    'M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12 6a.75.75 0 01.75.75v5.5a.75.75 0 01-1.5 0v-5.5A.75.75 0 0112 6zm0 10.5a.9.9 0 110 1.8.9.9 0 010-1.8z',
+  warning:
+    'M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.75c1.155 2-.289 4.5-2.598 4.5H4.644c-2.309 0-3.752-2.5-2.598-4.5L9.401 3.003zM12 8.25a.75.75 0 00-.75.75v3a.75.75 0 001.5 0v-3a.75.75 0 00-.75-.75zm0 6a.75.75 0 100 1.5.75.75 0 000-1.5z',
+};
+
+/**
+ * Klassifiserer en E. coli-verdi etter Helsedirektoratets vannkvalitetsnormer
+ * for friluftsbad. Returnerer nivå, brukervendt tekst og hvilket ikon som skal vises.
+ */
+function classifyValue(value) {
+  if (value >= CONFIG.THRESHOLD_HIGH) {
+    return {
+      level: 'red',
+      label: 'Ikke akseptabel – ikke anbefalt for bading',
+      icon: ICON_PATHS.warning,
+    };
+  }
+
+  if (value >= CONFIG.THRESHOLD_GOOD) {
+    const needsFollowUp = value >= CONFIG.THRESHOLD_FOLLOWUP;
+    return {
+      level: 'yellow',
+      label: needsFollowUp
+        ? 'Mindre god – over grensen for oppfølgingsprøve'
+        : 'Mindre god – bad med forbehold',
+      icon: ICON_PATHS.caution,
+    };
+  }
+
+  return {
+    level: 'green',
+    label: 'God – trygt for bading',
+    icon: ICON_PATHS.success,
+  };
 }
 
 // === VÆRTEMPERATUR (Open-Meteo) ===
@@ -341,83 +404,118 @@ async function fetchFromBakterierWorker() {
   return data;
 }
 
-function processWorkerData(workerData) {
-  const currentDate = new Date();
-  const { week: currentWeek } = getWeekNumber(currentDate);
-
-  log('Prosesserer worker-data for uke:', currentWeek);
-
-  const availableWeeks = Object.keys(workerData.weeks)
-    .map(w => parseInt(w, 10))
-    .filter(w => {
-      const weekData = workerData.weeks[w];
-      return weekData && weekData.value && weekData.value.number !== null;
-    })
-    .sort((a, b) => a - b);
-
-  log('Tilgjengelige uker med verdier:', availableWeeks);
-
-  let actualWeek = currentWeek;
-  let matchType = 'exact';
-
-  if (!availableWeeks.includes(currentWeek)) {
-    if (availableWeeks.includes(currentWeek - 1)) {
-      actualWeek = currentWeek - 1;
-      matchType = 'past';
-    } else {
-      const pastWeeks = availableWeeks.filter(w => w < currentWeek).sort((a, b) => b - a);
-      if (pastWeeks.length > 0) {
-        actualWeek = pastWeeks[0];
-        matchType = 'past';
-      } else {
-        const futureWeeks = availableWeeks.filter(w => w > currentWeek).sort((a, b) => a - b);
-        if (futureWeeks.length > 0) {
-          actualWeek = futureWeeks[0];
-          matchType = 'future';
-        }
-      }
-    }
-
-    if (matchType !== 'exact') {
-      console.warn(`Fant ikke data for uke ${currentWeek}. Bruker uke ${actualWeek} i stedet.`);
-    }
+/**
+ * Normaliserer worker-responsen til en flat, kronologisk sortert serie.
+ *
+ * Nyere workere returnerer `series` med eksplisitt årstall. Eldre workere
+ * returnerer kun `weeks` uten år – da antas inneværende ISO-år, som er det
+ * beste tilgjengelige gjettet inntil workeren er deployet på nytt.
+ */
+function normalizeSeries(workerData) {
+  if (Array.isArray(workerData.series) && workerData.series.length > 0) {
+    return workerData.series
+      .filter(entry => entry && entry.value && entry.value.number !== null)
+      .map(entry => ({
+        year: entry.year,
+        week: entry.week,
+        value: entry.value.number,
+        isEstimate: entry.value.isEstimate,
+        raw: entry.raw,
+      }))
+      .sort((a, b) => weekOrdinal(a.year, a.week) - weekOrdinal(b.year, b.week));
   }
 
-  const weekData = workerData.weeks[actualWeek];
-  if (!weekData || weekData.value.number === null) {
+  log('Worker-respons mangler `series` – faller tilbake til `weeks` uten årstall');
+  const fallbackYear = getWeekNumber(new Date()).year;
+
+  return Object.keys(workerData.weeks || {})
+    .map(week => parseInt(week, 10))
+    .filter(week => {
+      const entry = workerData.weeks[week];
+      return entry && entry.value && entry.value.number !== null;
+    })
+    .sort((a, b) => a - b)
+    .map(week => ({
+      year: fallbackYear,
+      week,
+      value: workerData.weeks[week].value.number,
+      isEstimate: workerData.weeks[week].value.isEstimate,
+      raw: workerData.weeks[week].raw,
+    }));
+}
+
+function processWorkerData(workerData) {
+  const { week: currentWeek, year: currentYear } = getWeekNumber(new Date());
+  const target = weekOrdinal(currentYear, currentWeek);
+
+  log(`Prosesserer worker-data for uke ${currentWeek}, ${currentYear}`);
+
+  const series = normalizeSeries(workerData);
+  const availableWeeks = series.map(entry => ({ year: entry.year, week: entry.week }));
+
+  log('Tilgjengelige målinger:', availableWeeks);
+
+  if (series.length === 0) {
     return {
       value: null,
-      error: `Ingen verdi funnet for uke ${actualWeek}`,
+      error: 'Fant ingen måleverdier i datasettet.',
       availableWeeks,
       searchedWeek: currentWeek,
+      searchedYear: currentYear,
     };
   }
 
-  const foundValue = weekData.value.number;
-  const isEstimate = weekData.value.isEstimate;
-  const rawValue = weekData.raw;
+  // Serien er sortert kronologisk, så vi kan lete bakover for siste måling
+  // før inneværende uke. Dette krysser årsskiftet uten spesialtilfeller.
+  let index = series.findIndex(entry => weekOrdinal(entry.year, entry.week) === target);
+  let matchType = 'exact';
 
-  // Bygg historikk for siste 5 uker med verdier (inkluderer ukenummer)
-  const history = availableWeeks
-    .filter(w => w <= actualWeek)
-    .slice(-5)
-    .map(w => ({
-      week: w,
-      value: workerData.weeks[w].value.number,
-    }))
-    .filter(h => h.value !== null);
+  if (index === -1) {
+    for (let i = series.length - 1; i >= 0; i--) {
+      if (weekOrdinal(series[i].year, series[i].week) < target) {
+        index = i;
+        matchType = 'past';
+        break;
+      }
+    }
+  }
+
+  if (index === -1) {
+    // Ingen tidligere målinger – bruk den nærmeste fremtidige.
+    index = 0;
+    matchType = 'future';
+  }
+
+  const match = series[index];
+
+  if (matchType !== 'exact') {
+    console.warn(
+      `Fant ikke data for uke ${currentWeek}, ${currentYear}. ` +
+        `Bruker uke ${match.week}, ${match.year} i stedet.`
+    );
+  }
+
+  // Historikk: de siste 5 målingene til og med den valgte
+  const history = series.slice(Math.max(0, index - 4), index + 1).map(entry => ({
+    week: entry.week,
+    year: entry.year,
+    value: entry.value,
+  }));
 
   log(
-    `Bruker uke ${actualWeek} (søkte etter ${currentWeek}) - verdi: ${foundValue} - matchType: ${matchType}`
+    `Bruker uke ${match.week}, ${match.year} (søkte etter uke ${currentWeek}, ${currentYear}) ` +
+      `- verdi: ${match.value} - matchType: ${matchType}`
   );
 
   return {
-    value: foundValue,
+    value: match.value,
     availableWeeks,
     searchedWeek: currentWeek,
-    actualWeek,
-    isEstimate,
-    rawValue,
+    searchedYear: currentYear,
+    actualWeek: match.week,
+    actualYear: match.year,
+    isEstimate: match.isEstimate,
+    rawValue: match.raw,
     history,
   };
 }
@@ -445,6 +543,7 @@ function createMiniChart(historyData = []) {
 
   const values = historyData.map(h => h.value);
   const weeks = historyData.map(h => h.week);
+  const years = historyData.map(h => h.year);
 
   const maxVal = Math.max(...values);
   const minVal = Math.min(...values);
@@ -458,7 +557,7 @@ function createMiniChart(historyData = []) {
     const x = padX + (idx / Math.max(1, values.length - 1)) * (canvas.width - 2 * padX);
     const yNorm = (val - minVal) / span;
     const y = canvas.height - padY - yNorm * (canvas.height - padY - padTop);
-    return { x, y, val, week: weeks[idx] };
+    return { x, y, val, week: weeks[idx], year: years[idx] };
   });
 
   // Tegn linjen
@@ -474,12 +573,13 @@ function createMiniChart(historyData = []) {
   });
   ctx.stroke();
 
-  // Tegn punkter
-  ctx.fillStyle = '#ffffff';
-  ctx.strokeStyle = '#0077b6';
+  // Tegn punkter, farget etter vannkvalitetsnivå
+  const levelColors = { green: '#38ef7d', yellow: '#f5c542', red: '#f45c43' };
   points.forEach(pt => {
     ctx.beginPath();
-    ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
+    ctx.arc(pt.x, pt.y, 4.5, 0, Math.PI * 2);
+    ctx.fillStyle = levelColors[classifyValue(pt.val).level];
+    ctx.strokeStyle = '#0077b6';
     ctx.fill();
     ctx.stroke();
   });
@@ -498,7 +598,7 @@ function createMiniChart(historyData = []) {
   ctx.font = '11px Segoe UI';
   ctx.textBaseline = 'top';
   points.forEach(pt => {
-    ctx.fillText(`uke ${pt.week}`, pt.x, canvas.height - 18);
+    ctx.fillText(formatWeekLabel(pt).toLowerCase(), pt.x, canvas.height - 18);
   });
 
   return canvas;
@@ -508,21 +608,23 @@ function createMiniChart(historyData = []) {
 function createBarChart(historyData = []) {
   if (!historyData || historyData.length === 0) return null;
 
-  const threshold = CONFIG.THRESHOLD_HIGH;
-  const maxVal = Math.max(...historyData.map(h => h.value), threshold);
+  const maxVal = Math.max(...historyData.map(h => h.value), CONFIG.THRESHOLD_HIGH);
+
+  // Klassifisering -> CSS-klasse på søylen
+  const barClass = { green: 'safe', yellow: 'caution', red: 'warning' };
 
   const container = document.createElement('div');
   container.className = 'graph-bars';
 
   historyData.forEach(item => {
     const heightPercent = maxVal > 0 ? (item.value / maxVal) * 100 : 0;
-    const isSafe = item.value <= threshold;
+    const { level } = classifyValue(item.value);
     const barContainer = document.createElement('div');
     barContainer.className = 'bar-container';
     barContainer.innerHTML = `
       <div class="bar-value">${Math.round(item.value)}</div>
-      <div class="bar-wrapper"><div class="bar ${isSafe ? '' : 'warning'}" style="height: ${Math.max(heightPercent, 8)}%;"></div></div>
-      <div class="bar-label">Uke ${item.week}</div>
+      <div class="bar-wrapper"><div class="bar ${barClass[level]}" style="height: ${Math.max(heightPercent, 8)}%;"></div></div>
+      <div class="bar-label">${formatWeekLabel(item)}</div>
     `;
     container.appendChild(barContainer);
   });
@@ -531,8 +633,9 @@ function createBarChart(historyData = []) {
   const legend = document.createElement('div');
   legend.className = 'chart-legend';
   legend.innerHTML = `
-    <div class="legend-item"><div class="legend-color safe"></div><span>Under grense</span></div>
-    <div class="legend-item"><div class="legend-color warning"></div><span>Over grense</span></div>
+    <div class="legend-item"><div class="legend-color safe"></div><span>God (&lt;${CONFIG.THRESHOLD_GOOD})</span></div>
+    <div class="legend-item"><div class="legend-color caution"></div><span>Mindre god</span></div>
+    <div class="legend-item"><div class="legend-color warning"></div><span>Ikke akseptabel (&ge;${CONFIG.THRESHOLD_HIGH})</span></div>
   `;
 
   // Returner en wrapper med både bars og legend
@@ -641,6 +744,7 @@ function updateUI(result) {
   let value = null;
   let errorMessage = null;
   let actualWeek = null;
+  let actualYear = null;
   let isEstimate = false;
   let rawValue = null;
   let history = null;
@@ -649,6 +753,7 @@ function updateUI(result) {
     value = result.value;
     errorMessage = result.error;
     actualWeek = result.actualWeek;
+    actualYear = result.actualYear;
     isEstimate = result.isEstimate;
     rawValue = result.rawValue;
     history = result.history;
@@ -677,44 +782,27 @@ function updateUI(result) {
 
   valueDisplay.textContent = Math.round(value);
 
-  // SVG path for warning icon
-  const warningIconPath =
-    'M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.75c1.155 2-.289 4.5-2.598 4.5H4.644c-2.309 0-3.752-2.5-2.598-4.5L9.401 3.003zM12 8.25a.75.75 0 00-.75.75v3a.75.75 0 001.5 0v-3a.75.75 0 00-.75-.75zm0 6a.75.75 0 100 1.5.75.75 0 000-1.5z';
+  const status = classifyValue(value);
 
-  // SVG path for success icon
-  const successIconPath =
-    'M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z';
-
-  if (value >= CONFIG.THRESHOLD_HIGH) {
-    valueDisplay.className = 'value-display red';
-    if (statusTextLabel) {
-      statusTextLabel.textContent = 'Ikke anbefalt for bading';
-    } else {
-      statusText.textContent = 'Ikke anbefalt for bading';
-    }
-    if (statusIconPath) {
-      statusIconPath.setAttribute('d', warningIconPath);
-    }
-    const theme = getTheme();
-    statusText.className = theme === 'brutalist' ? 'status-text warning' : 'status-text red';
+  valueDisplay.className = `value-display ${status.level}`;
+  if (statusTextLabel) {
+    statusTextLabel.textContent = status.label;
   } else {
-    valueDisplay.className = 'value-display green';
-    if (statusTextLabel) {
-      statusTextLabel.textContent = 'Trygt for bading';
-    } else {
-      statusText.textContent = 'Trygt for bading';
-    }
-    if (statusIconPath) {
-      statusIconPath.setAttribute('d', successIconPath);
-    }
-    statusText.className = 'status-text green';
+    statusText.textContent = status.label;
   }
+  if (statusIconPath) {
+    statusIconPath.setAttribute('d', status.icon);
+  }
+  statusText.className = `status-text ${status.level}`;
 
-  const weekToShow = actualWeek !== null && actualWeek !== undefined ? actualWeek : currentWeek;
-  if (actualWeek !== null && actualWeek !== currentWeek) {
-    weekInfo.textContent = `Uke ${weekToShow} (søkte etter uke ${currentWeek}), ${currentWeekYear}`;
+  const weekToShow = actualWeek ?? currentWeek;
+  const yearToShow = actualYear ?? currentWeekYear;
+
+  if (weekToShow !== currentWeek || yearToShow !== currentWeekYear) {
+    weekInfo.textContent =
+      `Uke ${weekToShow}, ${yearToShow} ` + `(søkte etter uke ${currentWeek}, ${currentWeekYear})`;
   } else {
-    weekInfo.textContent = `Uke ${weekToShow}, ${currentWeekYear}`;
+    weekInfo.textContent = `Uke ${weekToShow}, ${yearToShow}`;
   }
 
   if (isEstimate && rawValue) {
