@@ -49,7 +49,10 @@ function getCorsHeaders(request) {
     };
   }
 
-  // For requests uten Origin header (direkte API-kall), tillat alle
+  // Requests uten Origin (curl, server-til-server, /docs-brukere) slipper
+  // gjennom. Bevisst valg: dette er ment å være et åpent API, og
+  // allowlisten over er derfor en bekvemmelighet for nettlesere, ikke
+  // en sikkerhetsgrense. Dataene er offentlige uansett.
   if (!origin) {
     return {
       'Access-Control-Allow-Origin': '*',
@@ -129,6 +132,15 @@ export default {
 
       // Parse tabellene per årssegment
       const result = parseSegments(segments, debug);
+
+      // Regex-parsing av Google Docs-HTML er skjørt. Endrer kommunen
+      // tabellstrukturen, ville vi ellers returnert en tom serie stille og
+      // rolig - og først oppdaget det når noen sier fra. Feil ut i stedet,
+      // så det når feilloggen.
+      if (result.series.length === 0) {
+        throw new Error('Fant ingen målinger i dokumentet. Sannsynligvis endret tabellstruktur.');
+      }
+
       result.lastUpdated = new Date().toISOString();
 
       if (debug) {
@@ -339,9 +351,10 @@ function getUkensHtml() {
           fetch('https://bakterier.nytroe.workers.dev/')
               .then(res => res.json())
               .then(data => {
-                  const siste = Math.max(...Object.keys(data.weeks));
-                  const verdi = data.weeks[siste]?.raw ?? 'X';
-                  document.getElementById('content').textContent = verdi;
+                  // series er kronologisk sortert med eksplisitt årstall, så
+                  // siste element er nyeste måling også over et årsskifte
+                  const siste = data.series?.[data.series.length - 1];
+                  document.getElementById('content').textContent = siste?.raw ?? 'X';
               })
               .catch(() => document.getElementById('content').textContent = 'X');
       </script>

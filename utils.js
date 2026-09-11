@@ -5,6 +5,18 @@
  * nettleser, i Workers-runtime og i vitest.
  */
 
+/**
+ * Appversjonen. Eneste sted den skal endres.
+ *
+ * Herfra utledes tre ting som tidligere måtte bumpes hver for seg:
+ *  - Sentry-releasen  (app.js)
+ *  - localStorage-cachen (app.js)
+ *  - Service Worker-cachen, via ?v= på registreringen (sw.js)
+ *
+ * Bump ved endringer som gjør gammel cache ugyldig, eller ved ny utgivelse.
+ */
+export const APP_VERSION = '1.1.0';
+
 // === DEBUG-LOGGING ===
 
 let debugEnabled = false;

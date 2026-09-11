@@ -1,4 +1,5 @@
 import {
+  APP_VERSION,
   classifyValue,
   formatWeekLabel,
   getWeekNumber,
@@ -13,8 +14,10 @@ const CONFIG = {
   DEBUG: false,
   CACHE_KEY: 'havet_arena_data',
   CACHE_DURATION: 1000 * 60 * 60, // 1 time
-  CACHE_VERSION: 9, // v9: delt utils.js-modul
-  // Grenseverdiene bor i utils.js (THRESHOLDS) - de deles med workeren.
+  // Versjonen bor i utils.js (APP_VERSION) og styrer både Sentry-release,
+  // localStorage-cachen og Service Worker-cachen. Grenseverdiene ligger
+  // samme sted (THRESHOLDS) og deles med workeren.
+  CACHE_VERSION: APP_VERSION,
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000,
   THEME_KEY: 'havet_arena_theme',
@@ -23,15 +26,12 @@ const CONFIG = {
     BAKTERIER_WORKER: 'https://bakterier.nytroe.workers.dev/',
     BADING_WORKER: 'https://bading.nytroe.workers.dev/',
     HAVVARSEL_API: 'https://api.havvarsel.no/apis/duapi/havvarsel/v2/temperatureprojection',
-    CORS_PROXY: 'https://api.allorigins.win/raw',
     OPEN_METEO: 'https://api.open-meteo.com/v1/forecast',
   },
   // Sentry konfigurasjon - sett din egen DSN her
   SENTRY_DSN:
     'https://0bc32267eafbb1fb9b68fcfaeb23d2a0@o4510692242292736.ingest.de.sentry.io/4510692677386320',
 };
-
-let CURRENT_REQUEST_ID = 0;
 
 // Koordinater for Havet Arena, Nyhavna
 const LAT = 63.44181;
@@ -47,13 +47,17 @@ function initSentry() {
 
   const script = document.createElement('script');
   script.src = 'https://browser.sentry-cdn.com/8.42.0/bundle.min.js';
+  // Subresource Integrity: hashen er knyttet til den pinnede versjonen over.
+  // Byttes versjonen, må hashen regnes ut på nytt:
+  //   curl -s <url> | openssl dgst -sha384 -binary | openssl base64 -A
+  script.integrity = 'sha384-mnCU8xfJtutEToQVAp8cVl1c5MsLJHnf0uLTs2w7gf115tH/bz7Nwd+LgjiBgW5P';
   script.crossOrigin = 'anonymous';
   script.onload = () => {
     if (window.Sentry) {
       window.Sentry.init({
         dsn: CONFIG.SENTRY_DSN,
         environment: window.location.hostname === 'havet.app' ? 'production' : 'development',
-        release: `havet-arena@${CONFIG.CACHE_VERSION}`,
+        release: `havet-arena@${APP_VERSION}`,
         tracesSampleRate: 0.1,
         beforeSend(event) {
           // Ikke send events fra localhost
@@ -215,25 +219,10 @@ async function fetchFromHavvarselDirect() {
   return temp;
 }
 
-async function fetchFromHavvarselProxy() {
-  const targetUrl = `${CONFIG.URLS.HAVVARSEL_API}/${LON}/${LAT}`;
-  const proxyUrl = `${CONFIG.URLS.CORS_PROXY}?url=${encodeURIComponent(targetUrl)}`;
-
-  const res = await fetchWithRetry(() => fetchWithTimeout(proxyUrl, {}, 10000));
-  if (!res.ok) throw new Error(`Proxy status: ${res.status}`);
-
-  const data = await res.json();
-  const temp = parseHavvarselJson(data);
-
-  if (temp === undefined || temp === null) throw new Error('Fant ikke temperatur i proxy-data');
-  return temp;
-}
-
 async function getSeaTemperatureAtHavetArena() {
   const sources = [
     { name: 'Cloudflare Worker', fn: fetchFromWorker },
     { name: 'Havvarsel API', fn: fetchFromHavvarselDirect },
-    { name: 'Havvarsel Proxy', fn: fetchFromHavvarselProxy },
   ];
 
   log('Starter henting av badetemperatur...');
@@ -452,21 +441,29 @@ function setTheme(theme) {
   } catch (_e) {
     // Ignorer localStorage-feil (f.eks. i private browsing)
   }
-  document.body.className = `theme-${theme}`;
+  // dataset.theme framfor body.className: settes allerede av inline-scriptet
+  // i <head>, og overskriver ikke andre klasser på elementet
+  document.documentElement.dataset.theme = theme;
   updateThemeToggle();
 }
 
 function updateThemeToggle() {
   const toggle = document.getElementById('themeToggle');
-  if (toggle) {
-    const currentTheme = getTheme();
-    toggle.textContent = currentTheme === 'brutalist' ? '🎨 Modern' : '💀 Brutalist';
-  }
+  if (!toggle) return;
+
+  const isBrutalist = getTheme() === 'brutalist';
+  toggle.textContent = isBrutalist ? '🎨 Modern' : '💀 Brutalist';
+  toggle.setAttribute('aria-pressed', String(isBrutalist));
+  toggle.setAttribute(
+    'aria-label',
+    isBrutalist ? 'Bytt til modern tema' : 'Bytt til brutalist-tema'
+  );
 }
 
 function initTheme() {
-  const theme = getTheme();
-  document.body.className = `theme-${theme}`;
+  // Selve temaet er allerede satt av inline-scriptet i <head>. Her sikrer vi
+  // bare at attributt og knapp er i sync hvis localStorage feilet der.
+  document.documentElement.dataset.theme = getTheme();
   updateThemeToggle();
 }
 
@@ -491,6 +488,32 @@ function initThemeToggle() {
   }
 }
 
+// Tekstalternativ til grafen. Selve grafen er aria-hidden, så dette er
+// eneste vei inn til historikken for skjermlesere.
+function renderHistoryTable(history) {
+  const body = document.getElementById('historyTableBody');
+  if (!body) return;
+
+  body.innerHTML = '';
+
+  for (const entry of history) {
+    const row = document.createElement('tr');
+
+    const week = document.createElement('th');
+    week.setAttribute('scope', 'row');
+    week.textContent = formatWeekLabel(entry);
+
+    const value = document.createElement('td');
+    value.textContent = `${Math.round(entry.value)}`;
+
+    const level = document.createElement('td');
+    level.textContent = classifyValue(entry.value).label;
+
+    row.append(week, value, level);
+    body.appendChild(row);
+  }
+}
+
 function renderChart(history) {
   const historyContainer = document.getElementById('historyChart');
   if (!historyContainer) return;
@@ -498,6 +521,8 @@ function renderChart(history) {
   const theme = getTheme();
   historyContainer.innerHTML = '';
   historyContainer.dataset.history = JSON.stringify(history);
+
+  renderHistoryTable(history || []);
 
   if (history && Array.isArray(history) && history.length > 0) {
     if (theme === 'brutalist') {
@@ -652,18 +677,68 @@ async function fetchWithCache() {
 
 // === SERVICE WORKER ===
 
+/**
+ * Viser en diskret melding når en ny versjon er lastet ned og venter.
+ * Vi tvinger ikke fram reload - det kan rive bort innhold brukeren leser.
+ */
+function showUpdateBanner(waitingWorker) {
+  if (document.getElementById('updateBanner')) return;
+
+  const banner = document.createElement('div');
+  banner.id = 'updateBanner';
+  banner.className = 'update-banner';
+  banner.setAttribute('role', 'status');
+
+  const text = document.createElement('span');
+  text.textContent = 'Ny versjon tilgjengelig';
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'update-banner-button';
+  button.textContent = 'Oppdater';
+  button.addEventListener('click', () => {
+    // Når den nye workeren tar over, laster vi siden på nytt én gang
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.location.reload();
+    });
+    waitingWorker.postMessage('skipWaiting');
+  });
+
+  banner.append(text, button);
+  document.body.appendChild(banner);
+}
+
 function registerServiceWorker() {
-  if ('serviceWorker' in navigator) {
-    // Bruk relativ path for å støtte både localhost og produksjon
-    const swPath = window.location.hostname === 'localhost' ? '/sw.js' : '/sw.js';
-    navigator.serviceWorker
-      .register(swPath)
-      .then(_reg => log('Service Worker registrert'))
-      .catch(err => {
-        // Ikke logg som feil - SW er valgfritt
-        log('Service Worker ikke tilgjengelig:', err.message);
+  if (!('serviceWorker' in navigator)) return;
+
+  navigator.serviceWorker
+    // ?v= gjør at en ny versjon gir ny SW-registrering og ny cache-nøkkel
+    .register(`/sw.js?v=${APP_VERSION}`)
+    .then(registration => {
+      log('Service Worker registrert');
+
+      // Allerede en oppdatering klar ved lasting
+      if (registration.waiting && navigator.serviceWorker.controller) {
+        showUpdateBanner(registration.waiting);
+      }
+
+      registration.addEventListener('updatefound', () => {
+        const installing = registration.installing;
+        if (!installing) return;
+
+        installing.addEventListener('statechange', () => {
+          // 'installed' med en eksisterende controller betyr oppdatering,
+          // ikke første gangs installasjon
+          if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+            showUpdateBanner(installing);
+          }
+        });
       });
-  }
+    })
+    .catch(err => {
+      // Ikke logg som feil - SW er valgfritt
+      log('Service Worker ikke tilgjengelig:', err.message);
+    });
 }
 
 // === INITIALISERING ===
@@ -687,14 +762,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateSeaTemperature();
 
   try {
-    const myRequestId = ++CURRENT_REQUEST_ID;
     const value = await fetchWithCache();
-
-    if (myRequestId === CURRENT_REQUEST_ID) {
-      updateUI(value);
-    } else {
-      log('Ignorerer utdatert respons (race condition unngått).');
-    }
+    updateUI(value);
   } catch (error) {
     captureError(error, { source: 'DOMContentLoaded' });
     const loadingEl = document.getElementById('loading');

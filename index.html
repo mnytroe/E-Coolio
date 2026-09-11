@@ -25,7 +25,7 @@
     <!-- CSP: Tillater nødvendige eksterne ressurser -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' https://browser.sentry-cdn.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://*.nytroe.workers.dev https://api.open-meteo.com https://api.havvarsel.no https://api.allorigins.win https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://browser.sentry-cdn.com;"
+      content="default-src 'self'; script-src 'self' 'sha256-rGPplTPdsuit5m1dx74MDKEPENJGPd4OX1BCRP6tBXU=' https://browser.sentry-cdn.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://*.nytroe.workers.dev https://api.open-meteo.com https://api.havvarsel.no https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://browser.sentry-cdn.com;"
     />
     <title>Havet Arena - Badevilkår</title>
 
@@ -43,15 +43,40 @@
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='50%25' x='50%25' font-size='52' text-anchor='middle' dominant-baseline='central'%3E%F0%9F%8F%8A%E2%80%8D%E2%99%80%EF%B8%8F%3C/text%3E%3C/svg%3E"
     />
 
+    <!-- iOS bruker denne ved "Legg til på hjemskjerm" - manifest-ikoner ignoreres -->
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="Havet Arena" />
+
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json" />
+
+    <!--
+      Setter temaet før første maling, ellers blinker modern-temaet forbi for
+      brukere som har valgt brutalist. Må stå før stilarket og kan ikke være
+      defer/module - den må blokkere.
+    -->
+    <script>
+      try {
+        document.documentElement.dataset.theme =
+          localStorage.getItem('havet_arena_theme') || 'modern';
+      } catch (e) {
+        document.documentElement.dataset.theme = 'modern';
+      }
+    </script>
 
     <!-- Styles -->
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <a href="#content" class="skip-link">Hopp til innhold</a>
-    <button id="themeToggle" class="theme-toggle" aria-label="Bytt tema">💀 Brutalist</button>
+    <button
+      id="themeToggle"
+      class="theme-toggle"
+      aria-label="Bytt til brutalist-tema"
+      aria-pressed="false"
+    >
+      💀 Brutalist
+    </button>
 
     <!-- Brutalist Header (kun synlig i brutalist-tema) -->
     <header class="brutalist-header">
@@ -80,7 +105,7 @@
                 />
               </svg>
             </div>
-            <h1 class="header-h1">Havet Arena</h1>
+            <div class="header-h1" aria-hidden="true">Havet Arena</div>
           </div>
           <div class="header-temp-badges">
             <div id="headerTemperature" class="header-badge badge-muted" style="display: none">
@@ -217,7 +242,7 @@
           >
             -
           </div>
-          <div id="statusText" class="status-text" role="alert" aria-live="assertive">
+          <div id="statusText" class="status-text" aria-live="polite">
             <svg
               class="icon status-icon"
               xmlns="http://www.w3.org/2000/svg"
@@ -238,6 +263,19 @@
         </div>
 
         <div id="historyChart" class="history-chart" aria-hidden="true"></div>
+        <table id="historyTable" class="visually-hidden">
+          <caption>
+            Bakterieverdier siste fem uker, E. coli CFU per 100 ml
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Uke</th>
+              <th scope="col">Verdi</th>
+              <th scope="col">Vurdering</th>
+            </tr>
+          </thead>
+          <tbody id="historyTableBody"></tbody>
+        </table>
 
         <div id="error" class="error" style="display: none"></div>
 
@@ -325,7 +363,11 @@
           </details>
 
           <p style="margin-top: 15px; text-align: center">
-            <a href="https://www.trondheim.kommune.no/badevannskvalitet" target="_blank">
+            <a
+              href="https://www.trondheim.kommune.no/badevannskvalitet"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               Se detaljerte resultater hos Trondheim kommune
               <svg
                 class="icon icon-external"
