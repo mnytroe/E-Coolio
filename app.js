@@ -668,6 +668,18 @@ async function fetchWithCache() {
 
 // === SERVICE WORKER ===
 
+// Settes når brukeren har trykket "Oppdater", slik at vi bare laster på nytt
+// når overtakelsen faktisk er noe brukeren har bedt om - ikke ved første
+// gangs installasjon, der clients.claim() også gir controllerchange.
+let updateRequested = false;
+let reloading = false;
+
+function reloadOnce() {
+  if (reloading) return;
+  reloading = true;
+  window.location.reload();
+}
+
 /**
  * Viser en diskret melding når en ny versjon er lastet ned og venter.
  * Vi tvinger ikke fram reload - det kan rive bort innhold brukeren leser.
@@ -688,11 +700,21 @@ function showUpdateBanner(waitingWorker) {
   button.className = 'update-banner-button';
   button.textContent = 'Oppdater';
   button.addEventListener('click', () => {
-    // Når den nye workeren tar over, laster vi siden på nytt én gang
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      window.location.reload();
-    });
+    button.disabled = true;
+    button.textContent = 'Oppdaterer...';
+    updateRequested = true;
+
+    // Har workeren allerede tatt over (eller er den borte), kommer det ingen
+    // ny controllerchange - da er en vanlig reload det som henter ny kode.
+    if (!waitingWorker || waitingWorker.state === 'redundant') {
+      reloadOnce();
+      return;
+    }
+
     waitingWorker.postMessage('skipWaiting');
+
+    // Sikkerhetsnett hvis controllerchange aldri kommer
+    setTimeout(reloadOnce, 3000);
   });
 
   banner.append(text, button);
@@ -701,6 +723,13 @@ function showUpdateBanner(waitingWorker) {
 
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
+
+  // Lyttes på én gang, før registreringen. Legges den til først i klikk-
+  // handleren, risikerer vi at overtakelsen allerede har skjedd og at
+  // hendelsen aldri kommer - da ble knappen bare sittende uten å gjøre noe.
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (updateRequested) reloadOnce();
+  });
 
   navigator.serviceWorker
     // ?v= gjør at en ny versjon gir ny SW-registrering og ny cache-nøkkel

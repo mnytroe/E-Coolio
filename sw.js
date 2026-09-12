@@ -17,13 +17,13 @@ const API_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24; // 1 døgn
 const CACHED_AT_HEADER = 'x-havet-cached-at';
 
 // Install - cache essential files
+//
+// Bevisst uten skipWaiting: den nye workeren skal bli stående i 'waiting' til
+// brukeren trykker "Oppdater" i banneret. Tar den over med en gang, rekker
+// controllerchange å fyre lenge før klikket, og knappen blir en no-op. Siden
+// ber om overtakelse via 'skipWaiting'-meldingen nederst i denne filen.
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches
-      .open(CACHE_NAME)
-      .then(cache => cache.addAll(ASSETS_TO_CACHE))
-      .then(() => self.skipWaiting())
-  );
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS_TO_CACHE)));
 });
 
 // Activate - clean up old caches
