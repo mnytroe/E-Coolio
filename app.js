@@ -46,11 +46,11 @@ function initSentry() {
   if (!CONFIG.SENTRY_DSN || sentryLoaded) return;
 
   const script = document.createElement('script');
-  script.src = 'https://browser.sentry-cdn.com/8.42.0/bundle.min.js';
+  script.src = 'https://browser.sentry-cdn.com/11.9.0/bundle.min.js';
   // Subresource Integrity: hashen er knyttet til den pinnede versjonen over.
   // Byttes versjonen, må hashen regnes ut på nytt:
   //   curl -s <url> | openssl dgst -sha384 -binary | openssl base64 -A
-  script.integrity = 'sha384-mnCU8xfJtutEToQVAp8cVl1c5MsLJHnf0uLTs2w7gf115tH/bz7Nwd+LgjiBgW5P';
+  script.integrity = 'sha384-xE/bmsH+mppbFLN9Cj+Lyc7rR9sTBh9p6GEswhQcoZPRAZbv5k6MRfdRIGnB+azV';
   script.crossOrigin = 'anonymous';
   script.onload = () => {
     if (window.Sentry) {

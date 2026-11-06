@@ -15,7 +15,7 @@
  *
  * Bump ved endringer som gjør gammel cache ugyldig, eller ved ny utgivelse.
  */
-export const APP_VERSION = '1.1.1';
+export const APP_VERSION = '1.1.2';
 
 // === DEBUG-LOGGING ===
 
