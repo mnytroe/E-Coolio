@@ -19,7 +19,7 @@
     "eslint": "^10.10.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.12.0",
-    "jsdom": "^30.0.1",
+    "jsdom": "^31.0.0",
     "prettier": "^3.9.6",
     "vitest": "^5.0.0",
     "wrangler": "^4.131.1"
