@@ -42,6 +42,13 @@
   --coral: #ff6b6b;
   --seaweed: #2d6a4f;
   --accent: var(--ocean-mid);
+
+  /* Linjegrafen (canvas) leser disse i app.js */
+  --chart-line: var(--ocean-mid);
+  --chart-label: var(--ocean-foam);
+  --level-green: #38ef7d;
+  --level-yellow: #f5c542;
+  --level-red: #f45c43;
 }
 
 * {

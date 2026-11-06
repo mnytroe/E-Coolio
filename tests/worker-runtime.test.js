@@ -155,6 +155,14 @@ describe('worker i workerd: caching og /docs', () => {
     expect([first.series[0].raw, second.series[0].raw]).toEqual(['5', '5']);
   });
 
+  it('er et åpent API: samme CORS-svar uansett origin', async () => {
+    for (const origin of ['https://havet.app', 'https://annen.side', 'null']) {
+      const res = await mf.dispatchFetch('http://localhost/', { headers: { Origin: origin } });
+      await res.arrayBuffer();
+      expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*');
+    }
+  });
+
   it('viser grenseverdiene fra utils.js på /docs', async () => {
     const html = await (await mf.dispatchFetch('http://localhost/docs')).text();
 

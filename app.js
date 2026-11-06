@@ -159,7 +159,9 @@ async function fetchWithRetry(
 
 async function getTempAtHavetSauna() {
   const url = `${CONFIG.URLS.OPEN_METEO}?latitude=${LAT}&longitude=${LON}&current=temperature_2m&timezone=Europe%2FOslo`;
-  const res = await fetch(url);
+  const res = await fetchWithRetry(() =>
+    fetchWithTimeout(url, { headers: { Accept: 'application/json' } })
+  );
   if (!res.ok) throw new Error(`Open-Meteo failed: ${res.status}`);
   const data = await res.json();
   return data?.current?.temperature_2m;
@@ -292,7 +294,11 @@ async function fetchFromBakterierWorker() {
   const data = await response.json();
   log('Bakteriedata mottatt fra worker:', data);
 
-  if (!data.weeks || Object.keys(data.weeks).length === 0) {
+  // series er det processWorkerData faktisk bruker. weeks godtas bare for
+  // eldre workere som ikke sender series.
+  const hasSeries = Array.isArray(data.series) && data.series.length > 0;
+  const hasWeeks = data.weeks && Object.keys(data.weeks).length > 0;
+  if (!hasSeries && !hasWeeks) {
     throw new Error('Ingen ukedata funnet i worker-respons');
   }
 
@@ -312,13 +318,36 @@ async function fetchSheetData() {
 
 // === UI / VISNING ===
 
+/** Leser en CSS-variabel fra :root, med fallback hvis den ikke er satt. */
+function cssVar(name, fallback) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
+const CHART_WIDTH = 300;
+const CHART_HEIGHT = 140;
+const CHART_FONT = '"Segoe UI", system-ui, sans-serif';
+
 // Vis graf med verdier OG ukenummer
 function createMiniChart(historyData = []) {
   const canvas = document.createElement('canvas');
-  canvas.width = 300;
-  canvas.height = 140;
+  // Tegn i fysiske piksler og skaler ned med CSS, ellers blir grafen
+  // uskarp på skjermer med devicePixelRatio > 1
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(CHART_WIDTH * dpr);
+  canvas.height = Math.round(CHART_HEIGHT * dpr);
+  canvas.style.width = `${CHART_WIDTH}px`;
+  canvas.style.height = `${CHART_HEIGHT}px`;
   const ctx = canvas.getContext('2d');
   if (!ctx || historyData.length === 0) return canvas;
+  ctx.scale(dpr, dpr);
+
+  const lineColor = cssVar('--chart-line', '#0077b6');
+  const labelColor = cssVar('--chart-label', '#90e0ef');
+  const levelColors = {
+    green: cssVar('--level-green', '#38ef7d'),
+    yellow: cssVar('--level-yellow', '#f5c542'),
+    red: cssVar('--level-red', '#f45c43'),
+  };
 
   const values = historyData.map(h => h.value);
   const weeks = historyData.map(h => h.week);
@@ -333,14 +362,14 @@ function createMiniChart(historyData = []) {
 
   // Beregn punktposisjoner
   const points = values.map((val, idx) => {
-    const x = padX + (idx / Math.max(1, values.length - 1)) * (canvas.width - 2 * padX);
+    const x = padX + (idx / Math.max(1, values.length - 1)) * (CHART_WIDTH - 2 * padX);
     const yNorm = (val - minVal) / span;
-    const y = canvas.height - padY - yNorm * (canvas.height - padY - padTop);
+    const y = CHART_HEIGHT - padY - yNorm * (CHART_HEIGHT - padY - padTop);
     return { x, y, val, week: weeks[idx], year: years[idx] };
   });
 
   // Tegn linjen
-  ctx.strokeStyle = '#0077b6';
+  ctx.strokeStyle = lineColor;
   ctx.lineWidth = 2;
   ctx.beginPath();
   points.forEach((pt, idx) => {
@@ -353,19 +382,18 @@ function createMiniChart(historyData = []) {
   ctx.stroke();
 
   // Tegn punkter, farget etter vannkvalitetsnivå
-  const levelColors = { green: '#38ef7d', yellow: '#f5c542', red: '#f45c43' };
   points.forEach(pt => {
     ctx.beginPath();
     ctx.arc(pt.x, pt.y, 4.5, 0, Math.PI * 2);
     ctx.fillStyle = levelColors[classifyValue(pt.val).level];
-    ctx.strokeStyle = '#0077b6';
+    ctx.strokeStyle = lineColor;
     ctx.fill();
     ctx.stroke();
   });
 
   // Tegn verdier over hvert punkt
-  ctx.fillStyle = '#90e0ef';
-  ctx.font = '10px Segoe UI';
+  ctx.fillStyle = labelColor;
+  ctx.font = `10px ${CHART_FONT}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
   points.forEach(pt => {
@@ -373,11 +401,11 @@ function createMiniChart(historyData = []) {
   });
 
   // Tegn ukenummer under hvert punkt
-  ctx.fillStyle = '#90e0ef';
-  ctx.font = '11px Segoe UI';
+  ctx.fillStyle = labelColor;
+  ctx.font = `11px ${CHART_FONT}`;
   ctx.textBaseline = 'top';
   points.forEach(pt => {
-    ctx.fillText(formatWeekLabel(pt).toLowerCase(), pt.x, canvas.height - 18);
+    ctx.fillText(formatWeekLabel(pt).toLowerCase(), pt.x, CHART_HEIGHT - 18);
   });
 
   return canvas;

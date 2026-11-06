@@ -3,14 +3,6 @@ import { parseValue, THRESHOLDS } from './utils.js';
 // Konfigurasjonsvariabler
 const CONFIG = {
   DOC_ID: '1RjJTWQTPRwHtWC-fi1QnelKcpBXXB3eLw7Ld-beK2TE',
-  // Tillatte domener for CORS (produksjon)
-  ALLOWED_ORIGINS: [
-    'https://havet.app',
-    'http://localhost:8080',
-    'http://localhost:8081',
-    'http://127.0.0.1:8080',
-    'http://127.0.0.1:8081',
-  ],
   // Rate limiting: maks forespørsler per minutt per IP
   RATE_LIMIT_PER_MINUTE: 60,
   CACHE_TTL_SECONDS: 3600, // 1 time
@@ -36,37 +28,16 @@ function isRateLimited(ip) {
   return false;
 }
 
-function getCorsHeaders(request) {
-  const origin = request.headers.get('Origin') || '';
-
-  // Sjekk om origin er tillatt
-  if (CONFIG.ALLOWED_ORIGINS.includes(origin)) {
-    return {
-      'Access-Control-Allow-Origin': origin,
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-      Vary: 'Origin',
-    };
-  }
-
-  // Requests uten Origin (curl, server-til-server, /docs-brukere) slipper
-  // gjennom. Bevisst valg: dette er ment å være et åpent API, og
-  // allowlisten over er derfor en bekvemmelighet for nettlesere, ikke
-  // en sikkerhetsgrense. Dataene er offentlige uansett.
-  if (!origin) {
-    return {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    };
-  }
-
-  // Ukjent origin - returner begrenset respons
-  return {
-    'Access-Control-Allow-Origin': 'null',
-    'Access-Control-Allow-Methods': 'GET',
-  };
-}
+// Åpent API: dataene er offentlige og /docs inviterer til bruk fra andre
+// sider. Tidligere fikk ukjente origins `Access-Control-Allow-Origin: null`.
+// Det stengte vanlige sider ute, men slapp inn nettopp sandkassede iframes og
+// file:// (origin "null"), og curl gikk uansett rett gjennom - en allowlist
+// uten sikkerhetsverdi, i strid med at API-et skal være åpent.
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
 
 export default {
   async fetch(request, _env, _ctx) {
@@ -81,7 +52,7 @@ export default {
         headers: {
           'Content-Type': 'application/json',
           'Retry-After': '60',
-          ...getCorsHeaders(request),
+          ...CORS_HEADERS,
         },
       });
     }
@@ -103,7 +74,7 @@ export default {
     // CORS Pre-flight
     if (request.method === 'OPTIONS') {
       return new Response(null, {
-        headers: getCorsHeaders(request),
+        headers: CORS_HEADERS,
       });
     }
 
@@ -144,7 +115,7 @@ export default {
       return new Response(JSON.stringify(result, null, debug ? 2 : 0), {
         headers: {
           'Content-Type': 'application/json',
-          ...getCorsHeaders(request),
+          ...CORS_HEADERS,
           'Cache-Control': `public, max-age=${CONFIG.CACHE_TTL_SECONDS}`,
         },
       });
@@ -153,7 +124,7 @@ export default {
         status: 500,
         headers: {
           'Content-Type': 'application/json',
-          ...getCorsHeaders(request),
+          ...CORS_HEADERS,
         },
       });
     }
