@@ -17,12 +17,18 @@
 
 Cloudflare Worker henter og parser dokumentet server-side:
 - Henter HTML fra Google Docs (`/export?format=html`)
-- Klipper bort 2024-data ved `"Resultater for 2024"`
+- Deler dokumentet i årssegmenter ved overskrifter som `"Resultater for 2025"`,
+  og beholder inneværende og forrige år (så uke 1–3 kan falle tilbake til
+  uke 51/52 i fjor)
 - Parser tabeller og ekstraherer `Havet Arena`-verdier
 - Returnerer JSON:
 
 ```json
 {
+  "series": [
+    { "year": 2025, "week": 50, "raw": "78", "value": { "number": 78, "isEstimate": false } },
+    ...
+  ],
   "weeks": {
     "50": { "raw": "78", "value": { "number": 78, "isEstimate": false } },
     ...
@@ -31,11 +37,17 @@ Cloudflare Worker henter og parser dokumentet server-side:
 }
 ```
 
+`series` er autoritativ: kronologisk sortert med eksplisitt årstall. `weeks`
+inneholder bare nyeste år uten årstall og beholdes for eldre klienter.
+
+Workeren har også to HTML-sider: `/docs` (API-dokumentasjon, grenseverdiene
+hentes fra `THRESHOLDS`) og `/ukens` (bare siste råverdi).
+
 **Fordeler med Worker**:
 - Skjuler datakilden fra klienten
 - Raskere (parsing på server)
 - Ingen CORS-problemer
-- Caching i Cloudflare edge
+- Dokumentet caches i workeren, så Google Docs ikke treffes på hvert kall
 
 #### 2. Badetemperatur (`bading.nytroe.workers.dev`)
 
@@ -72,15 +84,16 @@ Koden bruker **Strategy Pattern** for robust datahenting:
 
 ```
 Badetemperatur:
-1. Cloudflare Worker (primær)
+1. Cloudflare Worker (bading.nytroe.workers.dev)
 2. Havvarsel API direkte
-3. Havvarsel API via CORS-proxy
-4. Web scraping (siste utvei)
 
 Bakteriedata:
-1. Cloudflare Worker (primær)
-2. Google Docs HTML-parsing (legacy fallback)
+1. Cloudflare Worker (eneste kilde, med retry og timeout)
+   Feiler den, vises en feilmelding. localStorage-cachen og Service
+   Workerens API-cache (maks 1 døgn gammel) dekker korte avbrudd.
 ```
+
+`bading`-workeren ligger ikke i dette repoet.
 
 ---
 
@@ -119,16 +132,26 @@ fra `utils.js`.
 - Gyldighet: 1 time
 - Versjonering: `CACHE_VERSION` for å invalidere ved strukturendringer
 
-**Cloudflare Edge**:
-- Workers cacher responser i 1 time (`Cache-Control: public, max-age=3600`)
+**Service Worker** (`sw.js`):
+- Nett først for alt. Cachet versjon brukes kun offline.
+- API-svar brukes offline bare hvis de er under 1 døgn gamle.
+
+**Bakterie-workeren**:
+- Google Docs-dokumentet caches i 1 time i minnet per isolate, og via
+  `cf.cacheTtl` i edge der workeren kjører på en sone med cache.
+  `?debug=true` henter alltid ferskt.
+- Svaret sendes med `Cache-Control: public, max-age=3600`, som gjelder
+  nettleseren. Cloudflare cacher ikke svar workeren lager selv.
 
 ---
 
 ### Viktige invariants
 
-1. **Kun 2025-data**: Worker klipper bort alt etter "Resultater for 2024"
+1. **Inneværende og forrige år**: Worker forkaster eldre årssegmenter
 2. **Kun Havet Arena**: Verdier fra Strandveikaia ignoreres
-3. **Fallback-regler**: Hvis uke N mangler, bruk uke N-1 (ikke eldre)
+3. **Fallback-regler**: Hvis uke N mangler, bruk nyeste måling før N (også over
+   årsskiftet). Finnes ingen eldre, brukes nærmeste fremtidige. UI-et viser da
+   hvilken uke som faktisk vises.
 4. **Estimerte verdier**: `>N` vises med fotnote
 
 ---

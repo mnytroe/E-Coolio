@@ -1,6 +1,6 @@
 name = "bakterier"
 main = "worker.js"
-compatibility_date = "2025-01-01"
+compatibility_date = "2026-10-01"
 
 # worker.js importerer fra utils.js, som deles med frontend. Wrangler bundler
 # dem sammen ved deploy - derfor kan denne workeren ikke lenger deployes ved å

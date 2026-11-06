@@ -1,4 +1,4 @@
-import { parseValue } from './utils.js';
+import { parseValue, THRESHOLDS } from './utils.js';
 
 // Konfigurasjonsvariabler
 const CONFIG = {
@@ -108,20 +108,8 @@ export default {
     }
 
     try {
-      // Hent HTML fra Google Docs
-      const htmlUrl = `https://docs.google.com/document/d/${CONFIG.DOC_ID}/export?format=html`;
-      const response = await fetch(htmlUrl, {
-        headers: {
-          'User-Agent': 'BadevannAPI/1.0',
-          Accept: 'text/html',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Google Docs feilet: ${response.status}`);
-      }
-
-      const html = await response.text();
+      // debug=true henter alltid ferskt, så man kan se endringer i dokumentet
+      const html = await fetchDocumentHtml(debug);
       const originalLength = html.length;
 
       // Del dokumentet i årssegmenter og behold inneværende + forrige år.
@@ -169,6 +157,41 @@ export default {
     }
   },
 };
+
+// Sist hentede dokument, delt av alle forespørsler i samme isolate.
+// Cache-Control på svaret vårt gjelder bare klienten - Cloudflare cacher ikke
+// svar workeren lager selv - så uten dette gikk hvert kall helt til Google Docs.
+let documentCache = null; // { html, fetchedAt }
+
+async function fetchDocumentHtml(bypassCache = false) {
+  const now = Date.now();
+  if (
+    !bypassCache &&
+    documentCache &&
+    now - documentCache.fetchedAt < CONFIG.CACHE_TTL_SECONDS * 1000
+  ) {
+    return documentCache.html;
+  }
+
+  const htmlUrl = `https://docs.google.com/document/d/${CONFIG.DOC_ID}/export?format=html`;
+  const response = await fetch(htmlUrl, {
+    headers: {
+      'User-Agent': 'BadevannAPI/1.0',
+      Accept: 'text/html',
+    },
+    // Edge-cache på tvers av isolates. Virker der workeren ligger på en sone
+    // med cache; på ren workers.dev er det isolate-cachen over som bærer.
+    cf: { cacheTtl: CONFIG.CACHE_TTL_SECONDS, cacheEverything: true },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Google Docs feilet: ${response.status}`);
+  }
+
+  const html = await response.text();
+  documentCache = { html, fetchedAt: now };
+  return html;
+}
 
 /**
  * Deler dokumentet i segmenter per år basert på overskrifter av typen
@@ -395,39 +418,44 @@ function getDocumentationHtml() {
   
       <h3>Responsformat (JSON)</h3>
       <pre>{
-    "weeks": {
-      "20": {
+    "series": [
+      {
+        "year": 2026,
+        "week": 20,
         "raw": "120",
         "value": { "number": 120, "isEstimate": false }
       },
-      "21": {
-        "raw": "<10",
+      {
+        "year": 2026,
+        "week": 21,
+        "raw": "&lt;10",
         "value": { "number": 10, "isEstimate": true }
       }
-    },
-    "lastUpdated": "2025-06-12T12:00:00Z"
+    ],
+    "weeks": { "20": { ... }, "21": { ... } },
+    "lastUpdated": "2026-06-12T12:00:00Z"
   }</pre>
-  
+      <p><code>series</code> er sortert kronologisk og har eksplisitt årstall, også over årsskiftet. <code>weeks</code> har bare nyeste år uten årstall og beholdes kun for bakoverkompatibilitet.</p>
+
       <h3>Grenseverdier (E. coli cfu/100ml)</h3>
       <ul>
-        <li><strong>God:</strong> < 1000</li>
-        <li><strong>Mindre god:</strong> 1000 – 4000 (Bading frarådes ofte over 1000)</li>
-        <li><strong>Ikke akseptabel:</strong> > 4000</li>
+        <li><strong>God:</strong> &lt; ${THRESHOLDS.GOOD}</li>
+        <li><strong>Mindre god:</strong> ${THRESHOLDS.GOOD}–${THRESHOLDS.HIGH - 1} (oppfølgingsprøve fra ${THRESHOLDS.FOLLOWUP})</li>
+        <li><strong>Ikke akseptabel:</strong> &ge; ${THRESHOLDS.HIGH} – bading frarådes</li>
       </ul>
+      <p>Kilde: Helsedirektoratets vannkvalitetsnormer for friluftsbad.</p>
   
       <h3>Eksempelkode (JavaScript)</h3>
       <pre>
   fetch('https://bakterier.nytroe.workers.dev/')
     .then(res => res.json())
     .then(data => {
-      // Finn siste uke
-      const uker = Object.keys(data.weeks).map(Number).sort((a, b) => b - a);
-      const sisteUke = uker[0];
-      const maaling = data.weeks[sisteUke];
-  
-      if (maaling) {
-        console.log(\`Uke \${sisteUke}: \${maaling.raw} E. coli\`);
-        if (maaling.value.number >= 1000) {
+      // series er kronologisk, så siste element er nyeste måling
+      const siste = data.series[data.series.length - 1];
+
+      if (siste) {
+        console.log(\`Uke \${siste.week}, \${siste.year}: \${siste.raw} E. coli\`);
+        if (siste.value.number >= ${THRESHOLDS.HIGH}) {
           console.warn("Bading frarådes!");
         }
       }
