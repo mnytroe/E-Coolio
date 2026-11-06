@@ -50,6 +50,7 @@ export default [
         fetch: 'readonly',
         URL: 'readonly',
         caches: 'readonly',
+        HTMLRewriter: 'readonly',
       },
     },
   },

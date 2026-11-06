@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { classifyValue, formatWeekLabel, processWorkerData, THRESHOLDS } from '../utils.js';
-import { splitByYear, parseSegments } from '../worker.js';
+import { assignYears, buildResult, decodeEntities } from '../worker.js';
 
 /** Kjører fn med systemklokka låst til et gitt tidspunkt. */
 function at(iso, fn) {
@@ -113,40 +113,50 @@ describe('formatWeekLabel', () => {
   });
 });
 
-describe('worker: splitByYear / parseSegments', () => {
-  const table = (weeks, values) =>
-    `<table><tr><td>Prøvepunkt</td>${weeks.map(w => `<td>Uke ${w}</td>`).join('')}</tr>` +
-    `<tr><td>Havet Arena</td>${values.map(v => `<td>${v}</td>`).join('')}</tr>` +
-    `<tr><td>Strandveikaia</td>${values.map(() => '<td>9999</td>').join('')}</tr></table>`;
+// HTML -> blokker testes i workerd: tests/worker-runtime.test.js
+describe('worker: assignYears / buildResult', () => {
+  const table = (weeks, values) => ({
+    type: 'table',
+    rows: [
+      ['Prøvepunkt', ...weeks.map(w => `Uke ${w}`)],
+      ['Havet Arena', ...values],
+      ['Strandveikaia', ...values.map(() => '9999')],
+    ],
+  });
+  const marker = year => ({ type: 'marker', year });
 
-  const doc =
-    `<h1>Resultater prøvetaking</h1>${table([1, 2], ['45', '>1200'])}` +
-    `<h2>Resultater for 2025</h2>${table([51, 52], ['120', '640'])}` +
-    `<h2>Resultater for 2024</h2>${table([30], ['88'])}`;
+  const blocks = [
+    table([1, 2], ['45', '>1200']),
+    marker(2025),
+    table([51, 52], ['120', '640']),
+    marker(2024),
+    table([30], ['88']),
+  ];
 
-  const parseDoc = () => parseSegments(splitByYear(doc, 2026).filter(s => s.year >= 2025));
+  const parseDoc = () => buildResult(assignYears(blocks, 2026).filter(t => t.year >= 2025));
 
-  it('gir hvert segment riktig årstall', () => {
-    expect(splitByYear(doc, 2026).map(s => s.year)).toEqual([2026, 2025, 2024]);
+  it('gir hver tabell årstallet til markøren over den', () => {
+    expect(assignYears(blocks, 2026).map(t => t.year)).toEqual([2026, 2025, 2024]);
+  });
+
+  it('gir tabellen årstallet til en markør rett foran den', () => {
+    // Slik extractBlocks gir det når markøren står inne i tabellen
+    const inTable = [marker(2026), table([1], ['5']), marker(2025), table([52], ['7'])];
+
+    expect(assignYears(inTable, 2026).map(t => t.year)).toEqual([2026, 2025]);
   });
 
   it('utleder året fra markøren når dokumentet ikke er oppdatert ennå', () => {
-    const stale = `${table([40], ['70'])}<h2>Resultater for 2024</h2>${table([30], ['88'])}`;
+    const stale = [table([40], ['70']), marker(2024), table([30], ['88'])];
 
-    expect(splitByYear(stale, 2026).map(s => s.year)).toEqual([2025, 2024]);
+    expect(assignYears(stale, 2026).map(t => t.year)).toEqual([2025, 2024]);
   });
 
   it('antar inneværende år når dokumentet ikke har årsmarkører', () => {
-    expect(splitByYear(table([40], ['70']), 2026).map(s => s.year)).toEqual([2026]);
+    expect(assignYears([table([40], ['70'])], 2026).map(t => t.year)).toEqual([2026]);
   });
 
-  it('godtar «Resultater 2025» uten «for»', () => {
-    const html = `${table([1], ['5'])}<h2>Resultater 2025</h2>`;
-
-    expect(splitByYear(html, 2026).map(s => s.year)).toEqual([2026, 2025]);
-  });
-
-  it('slår sammen segmenter til en kronologisk serie', () => {
+  it('slår sammen tabellene til en kronologisk serie', () => {
     expect(parseDoc().series.map(e => `${e.year}w${e.week}=${e.value.number}`)).toEqual([
       '2025w51=120',
       '2025w52=640',
@@ -165,5 +175,29 @@ describe('worker: splitByYear / parseSegments', () => {
 
   it('ignorerer Strandveikaia og leser kun Havet Arena', () => {
     expect(parseDoc().series.some(e => e.value.number === 9999)).toBe(false);
+  });
+
+  it('hopper over tomme celler og «-»', () => {
+    const result = buildResult([{ year: 2026, ...table([1, 2, 3], ['', '-', '12']) }]);
+
+    expect(result.series.map(e => e.week)).toEqual([3]);
+  });
+});
+
+describe('worker: decodeEntities', () => {
+  it.each([
+    ['Pr&oslash;vepunkt', 'Prøvepunkt'],
+    ['&AElig;&Oslash;&Aring; &aelig;&aring;', 'ÆØÅ æå'],
+    ['&gt;1200', '>1200'],
+    ['&#62;1200', '>1200'],
+    ['&#x3e;1200', '>1200'],
+    ['a&nbsp;b', 'a b'],
+    ['&amp;lt;', '&lt;'],
+  ])('%s -> %s', (input, expected) => {
+    expect(decodeEntities(input)).toBe(expected);
+  });
+
+  it('lar ukjente og ugyldige entiteter stå urørt', () => {
+    expect(decodeEntities('&ukjent; &#0; &#x110000;')).toBe('&ukjent; &#0; &#x110000;');
   });
 });

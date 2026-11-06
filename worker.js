@@ -112,14 +112,14 @@ export default {
       const html = await fetchDocumentHtml(debug);
       const originalLength = html.length;
 
-      // Del dokumentet i årssegmenter og behold inneværende + forrige år.
-      // Forrige år trengs for at uke 1-3 i januar skal kunne falle tilbake
-      // til uke 51/52 i fjor.
+      // Strøm dokumentet til årsmarkører og tabeller, gi hver tabell sitt år
+      // og behold inneværende + forrige år. Forrige år trengs for at uke 1-3
+      // i januar skal kunne falle tilbake til uke 51/52 i fjor.
       const currentYear = new Date().getFullYear();
-      const segments = splitByYear(html, currentYear).filter(seg => seg.year >= currentYear - 1);
+      const blocks = await extractBlocks(html);
+      const tables = assignYears(blocks, currentYear).filter(t => t.year >= currentYear - 1);
 
-      // Parse tabellene per årssegment
-      const result = parseSegments(segments, debug);
+      const result = buildResult(tables, debug);
 
       // Regex-parsing av Google Docs-HTML er skjørt. Endrer kommunen
       // tabellstrukturen, ville vi ellers returnert en tom serie stille og
@@ -134,7 +134,9 @@ export default {
       if (debug) {
         result._debug = {
           originalHtmlLength: originalLength,
-          segments: segments.map(seg => ({ year: seg.year, length: seg.html.length })),
+          blocks: blocks.map(b =>
+            b.type === 'marker' ? { marker: b.year } : { table: b.rows.length }
+          ),
           htmlSnippet: html.substring(0, 2000),
         };
       }
@@ -193,68 +195,239 @@ async function fetchDocumentHtml(bypassCache = false) {
   return html;
 }
 
-/**
- * Deler dokumentet i segmenter per år basert på overskrifter av typen
- * "Resultater for 2025" / "Resultater 2025".
- *
- * Dokumentet er sortert nyest først, så teksten FØR den første markøren hører
- * til året etter den første markøren. Hvis dokumentet ikke er oppdatert med
- * årets tall ennå, gir det riktig årstall likevel: er første markør 2024,
- * er innledningen 2025 – ikke "inneværende år".
- */
-export function splitByYear(html, currentYear) {
-  const markerRegex = /Resultater\s+(?:for\s+)?(\d{4})/g;
-  const markers = [];
-  let match;
+// === PARSING AV DOKUMENTET ===
+//
+// Parsingen er delt i to:
+//  1. extractBlocks: strømmer HTML-en gjennom HTMLRewriter og gir en ordnet
+//     liste med årsmarkører og tabeller. Trenger Workers-runtimen, og testes
+//     derfor via Miniflare (tests/worker-runtime.test.js).
+//  2. assignYears / buildResult: ren logikk på den listen. Testes direkte.
 
-  while ((match = markerRegex.exec(html)) !== null) {
-    markers.push({ year: parseInt(match[1], 10), index: match.index });
-  }
+// "Resultater for 2025" / "Resultater 2025"
+const YEAR_MARKER = /Resultater\s+(?:for\s+)?(\d{4})/g;
 
-  if (markers.length === 0) {
-    return [{ year: currentYear, html }];
-  }
+// Elementer som skiller tekst. Uten et mellomrom her ville to avsnitt flyte
+// sammen, f.eks. "...2024" + "Resultater" til "...2024Resultater".
+const TEXT_BREAK_ELEMENTS = 'p, h1, h2, h3, h4, h5, h6, li, div, br';
 
-  const segments = [{ year: markers[0].year + 1, html: html.slice(0, markers[0].index) }];
+// HTMLRewriter gir tekst med entiteter urørt. Google Docs bruker navngitte
+// entiteter for æøå i tillegg til de vanlige.
+const NAMED_ENTITIES = {
+  nbsp: ' ',
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  aelig: 'æ',
+  oslash: 'ø',
+  aring: 'å',
+  AElig: 'Æ',
+  Oslash: 'Ø',
+  Aring: 'Å',
+  ndash: '–',
+  mdash: '—',
+};
 
-  for (let i = 0; i < markers.length; i++) {
-    const end = i + 1 < markers.length ? markers[i + 1].index : html.length;
-    segments.push({ year: markers[i].year, html: html.slice(markers[i].index, end) });
-  }
+/** Dekoder navngitte, desimale (&#62;) og heksadesimale (&#x3e;) entiteter. */
+export function decodeEntities(text) {
+  return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (match, code) => {
+    if (code[0] === '#') {
+      const isHex = code[1] === 'x' || code[1] === 'X';
+      const codePoint = parseInt(code.slice(isHex ? 2 : 1), isHex ? 16 : 10);
+      return codePoint > 0 && codePoint <= 0x10ffff ? String.fromCodePoint(codePoint) : match;
+    }
+    return NAMED_ENTITIES[code] ?? match;
+  });
+}
 
-  return segments;
+function normalizeText(raw) {
+  return decodeEntities(raw).replace(/\s+/g, ' ').trim();
 }
 
 /**
- * Parser hvert årssegment og slår resultatene sammen til:
+ * Strømmer dokumentet og returnerer, i dokumentrekkefølge:
+ *   { type: 'marker', year }   for hver "Resultater for ÅÅÅÅ". Står markøren
+ *                              i en tabell, kommer den rett før tabellen.
+ *   { type: 'table', rows }    for hver tabell, rows = string[][]
+ *
+ * Tekst samles opp før den tolkes, fordi HTMLRewriter leverer den i biter:
+ * både en årsmarkør og en entitet kan være splittet over flere spenn.
+ */
+export async function extractBlocks(html) {
+  const blocks = [];
+  let outsideText = '';
+  let tableDepth = 0;
+  let table = null;
+  let row = null;
+  let cell = null;
+  let rawTextDepth = 0; // inne i <style>/<script>
+
+  const markersIn = text =>
+    [...text.matchAll(YEAR_MARKER)].map(match => ({
+      type: 'marker',
+      year: parseInt(match[1], 10),
+    }));
+
+  const flushText = () => {
+    blocks.push(...markersIn(normalizeText(outsideText)));
+    outsideText = '';
+  };
+
+  // Avslutter også ved neste start-tagg, så en manglende slutt-tagg ikke
+  // sluker cellen eller raden.
+  const endCell = () => {
+    if (cell !== null && row) {
+      const text = normalizeText(cell);
+      row.push(text);
+      // I Google Docs-dokumentet står "Resultater for ÅÅÅÅ" som første rad
+      // i tabellen, ikke som overskrift over den. Markøren gjelder da
+      // tabellen den står i, og legges foran den.
+      table.markers.push(...markersIn(text));
+    }
+    cell = null;
+  };
+  const endRow = () => {
+    endCell();
+    if (row && row.length > 0 && table) table.rows.push(row);
+    row = null;
+  };
+
+  const rewriter = new HTMLRewriter()
+    // Nøstede tabeller behandles som innhold i cellen rundt
+    .on('table', {
+      element(el) {
+        tableDepth++;
+        if (tableDepth === 1) {
+          flushText();
+          table = { rows: [], markers: [] };
+        }
+        el.onEndTag(() => {
+          tableDepth--;
+          if (tableDepth === 0 && table) {
+            endRow();
+            blocks.push(...table.markers, { type: 'table', rows: table.rows });
+            table = null;
+          }
+        });
+      },
+    })
+    .on('tr', {
+      element(el) {
+        if (tableDepth !== 1) return;
+        endRow();
+        row = [];
+        el.onEndTag(endRow);
+      },
+    })
+    .on('td, th', {
+      element(el) {
+        if (tableDepth !== 1) return;
+        endCell();
+        cell = '';
+        el.onEndTag(endCell);
+      },
+    })
+    .on(TEXT_BREAK_ELEMENTS, {
+      element() {
+        if (tableDepth === 0) outsideText += ' ';
+        else if (cell !== null) cell += ' ';
+      },
+    })
+    // Stilark og skript er ikke dokumenttekst
+    .on('style, script', {
+      element(el) {
+        rawTextDepth++;
+        el.onEndTag(() => rawTextDepth--);
+      },
+    })
+    .onDocument({
+      text(chunk) {
+        if (rawTextDepth > 0) return;
+        if (tableDepth === 0) outsideText += chunk.text;
+        else if (cell !== null) cell += chunk.text;
+      },
+    });
+
+  // Teksten må konsumeres for at handlerne skal kjøre
+  await rewriter.transform(new Response(html)).arrayBuffer();
+  flushText();
+
+  return blocks;
+}
+
+/**
+ * Gir hver tabell årstallet til nærmeste markør over den.
+ *
+ * Dokumentet er sortert nyest først, så tabellene FØR den første markøren
+ * hører til året etter den første markøren. Hvis dokumentet ikke er
+ * oppdatert med årets tall ennå, gir det riktig årstall likevel: er første
+ * markør 2024, er innledningen 2025 – ikke "inneværende år".
+ */
+export function assignYears(blocks, currentYear) {
+  const firstMarker = blocks.find(block => block.type === 'marker');
+  let year = firstMarker ? firstMarker.year + 1 : currentYear;
+  const tables = [];
+
+  for (const block of blocks) {
+    if (block.type === 'marker') {
+      year = block.year;
+    } else {
+      tables.push({ year, rows: block.rows });
+    }
+  }
+
+  return tables;
+}
+
+/**
+ * Plukker Havet Arena-verdiene ut av én tabell: { [uke]: { raw, value } }.
+ * Tabellen må ha en rad som starter med "Prøvepunkt" (ukene) og en som
+ * starter med "Havet Arena". Andre prøvepunkter ignoreres.
+ */
+function extractHavetArenaWeeks(rows) {
+  const weeks = {};
+  let headerRow = null;
+  let havetArenaRow = null;
+
+  for (const row of rows) {
+    const firstCell = (row[0] || '').toLowerCase();
+    if (firstCell.includes('prøvepunkt')) headerRow = row;
+    if (firstCell.includes('havet') && firstCell.includes('arena')) havetArenaRow = row;
+  }
+
+  if (!headerRow || !havetArenaRow) return weeks;
+
+  for (let i = 1; i < headerRow.length; i++) {
+    const headerCell = headerRow[i].toLowerCase();
+    const weekMatch = headerCell.match(/uke\s*(\d+)/) || headerCell.match(/^(\d+)$/);
+    const value = (havetArenaRow[i] || '').trim();
+
+    if (weekMatch && value && value !== '-') {
+      weeks[parseInt(weekMatch[1], 10)] = { raw: value, value: parseValue(value) };
+    }
+  }
+
+  return weeks;
+}
+
+/**
+ * Slår tabellene sammen til:
  *  - `series`: alle målinger med eksplisitt år (autoritativ kilde)
- *  - `weeks`:  kun inneværende år, i det gamle formatet (bakoverkompatibelt
+ *  - `weeks`:  kun nyeste år, i det gamle formatet (bakoverkompatibelt
  *              for klienter som ikke er oppdatert ennå)
  */
-export function parseSegments(segments, debug = false) {
+export function buildResult(tables, debug = false) {
   const series = [];
-  const tables = debug ? [] : undefined;
 
-  for (const segment of segments) {
-    const parsed = parseHtmlToBacteriaData(segment.html, debug);
-
-    for (const [week, entry] of Object.entries(parsed.weeks)) {
-      series.push({
-        year: segment.year,
-        week: parseInt(week, 10),
-        raw: entry.raw,
-        value: entry.value,
-      });
-    }
-
-    if (debug && parsed._tables) {
-      tables.push(...parsed._tables.map(t => ({ ...t, year: segment.year })));
+  for (const { year, rows } of tables) {
+    for (const [week, entry] of Object.entries(extractHavetArenaWeeks(rows))) {
+      series.push({ year, week: parseInt(week, 10), raw: entry.raw, value: entry.value });
     }
   }
 
   series.sort((a, b) => a.year - b.year || a.week - b.week);
 
-  // Bakoverkompatibelt `weeks`-objekt: nyeste år som finnes i dokumentet.
   const latestYear = series.length > 0 ? series[series.length - 1].year : null;
   const weeks = {};
   for (const entry of series) {
@@ -263,98 +436,16 @@ export function parseSegments(segments, debug = false) {
     }
   }
 
-  return { series, weeks, _tables: tables };
-}
+  const result = { series, weeks };
 
-function parseHtmlToBacteriaData(html, debug = false) {
-  const result = {
-    weeks: {},
-    _tables: debug ? [] : undefined,
-  };
-
-  html = html.replace(/\r?\n/g, ' ').replace(/\s+/g, ' ');
-
-  const tableRegex = /<table[^>]*>(.*?)<\/table>/gi;
-  let tableMatch;
-  let tableIndex = 0;
-
-  while ((tableMatch = tableRegex.exec(html)) !== null) {
-    const tableHtml = tableMatch[1];
-    tableIndex++;
-
-    const rows = [];
-    const rowRegex = /<tr[^>]*>(.*?)<\/tr>/gi;
-    let rowMatch;
-
-    while ((rowMatch = rowRegex.exec(tableHtml)) !== null) {
-      const rowHtml = rowMatch[1];
-      const cells = [];
-      const cellRegex = /<t[dh][^>]*>(.*?)<\/t[dh]>/gi;
-      let cellMatch;
-
-      while ((cellMatch = cellRegex.exec(rowHtml)) !== null) {
-        const cellText = cellMatch[1]
-          .replace(/<[^>]+>/g, '')
-          .replace(/&nbsp;/g, ' ')
-          .replace(/&amp;/g, '&')
-          .replace(/&lt;/g, '<')
-          .replace(/&gt;/g, '>')
-          .replace(/&#(\d+);/g, (_match, num) => String.fromCharCode(num))
-          .trim();
-        cells.push(cellText);
-      }
-
-      if (cells.length > 0) {
-        rows.push(cells);
-      }
-    }
-
-    if (debug && rows.length > 0) {
-      result._tables.push({
-        index: tableIndex,
-        rowCount: rows.length,
-        firstRow: rows[0]?.slice(0, 5),
-        secondRow: rows[1]?.slice(0, 5),
-      });
-    }
-
-    let headerRowIndex = -1;
-    let havetArenaRowIndex = -1;
-
-    for (let i = 0; i < rows.length; i++) {
-      const firstCell = (rows[i][0] || '').toLowerCase();
-      if (
-        firstCell.includes('pr') &&
-        (firstCell.includes('vepunkt') || firstCell.includes('øvepunkt'))
-      ) {
-        headerRowIndex = i;
-      }
-      if (firstCell.includes('havet') && firstCell.includes('arena')) {
-        havetArenaRowIndex = i;
-      }
-    }
-
-    if (headerRowIndex !== -1 && havetArenaRowIndex !== -1) {
-      const headerRow = rows[headerRowIndex];
-      const havetArenaRow = rows[havetArenaRowIndex];
-
-      for (let i = 1; i < headerRow.length; i++) {
-        const headerCell = headerRow[i].toLowerCase();
-        const weekMatch = headerCell.match(/uke\s*(\d+)/i) || headerCell.match(/^(\d+)$/);
-
-        if (weekMatch) {
-          const weekNum = parseInt(weekMatch[1], 10);
-          const value = havetArenaRow[i] || '';
-
-          if (value && value !== '-' && value.trim() !== '') {
-            result.weeks[weekNum] = {
-              raw: value,
-              value: parseValue(value),
-            };
-          }
-        }
-      }
-    }
+  if (debug) {
+    result._tables = tables.map((t, index) => ({
+      index: index + 1,
+      year: t.year,
+      rowCount: t.rows.length,
+      firstRow: t.rows[0]?.slice(0, 5),
+      secondRow: t.rows[1]?.slice(0, 5),
+    }));
   }
 
   return result;

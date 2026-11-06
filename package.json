@@ -20,6 +20,7 @@
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.12.0",
     "jsdom": "^31.0.0",
+    "miniflare": "5.20261104.0-beta",
     "prettier": "^3.9.6",
     "vitest": "^5.0.0",
     "wrangler": "^4.131.1"

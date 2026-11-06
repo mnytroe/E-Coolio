@@ -17,10 +17,12 @@
 
 Cloudflare Worker henter og parser dokumentet server-side:
 - Henter HTML fra Google Docs (`/export?format=html`)
-- Deler dokumentet i årssegmenter ved overskrifter som `"Resultater for 2025"`,
-  og beholder inneværende og forrige år (så uke 1–3 kan falle tilbake til
-  uke 51/52 i fjor)
-- Parser tabeller og ekstraherer `Havet Arena`-verdier
+- Strømmer HTML-en gjennom `HTMLRewriter` til årsmarkører
+  (`"Resultater for 2025"`) og tabeller. Markøren står som første rad _inne i_
+  årets første tabell, ikke som overskrift over den.
+- Gir hver tabell årstallet til nærmeste markør, og beholder inneværende og
+  forrige år (så uke 1–3 kan falle tilbake til uke 51/52 i fjor)
+- Ekstraherer `Havet Arena`-raden fra hver tabell
 - Returnerer JSON:
 
 ```json
@@ -109,7 +111,7 @@ Bakteriedata:
 ├── wrangler.toml   # Worker-deploy (npm run deploy:worker)
 ├── manifest.json   # PWA manifest
 ├── sw.js           # Service Worker for offline
-├── tests/          # Vitest, kjører mot utils.js og worker.js direkte
+├── tests/          # Vitest: rene funksjoner i Node, workeren i workerd (Miniflare)
 ├── ARCHITECTURE.md # Denne filen
 └── README.md       # Kort beskrivelse
 ```
